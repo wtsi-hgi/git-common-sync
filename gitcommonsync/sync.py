@@ -1,57 +1,71 @@
-import filecmp
-import os
-import re
-import shutil
-from typing import Set
-from tempfile import mkdtemp
-from time import sleep
-
 import logging
+import os
+import shutil
+from typing import Set, List
 
-import dirsync
-
+from gitcommonsync._ansible_runner import run_ansible_task
 from gitcommonsync.configuration import SyncConfiguration, FileSyncConfiguration
-from gitcommonsync.repository import GitConfiguration, checkout
+from gitcommonsync.repository import GitRepository, checkout
 
 _logger = logging.getLogger(__name__)
 
 
-def synchronise(configuration: SyncConfiguration, git_configuration: GitConfiguration):
+class Changed:
     """
     TODO
-    :param configuration:
+    """
+    def __init__(self, files: List[str]=None):
+        self.files = files if files is not None else []
+
+
+def synchronise(git_repository: GitRepository, sync_configuration: SyncConfiguration) -> Changed:
+    """
+    Clones, updates and commits to the given repository, according to the given synchronisation configuration.
+    :param git_repository: the git repository
+    :param sync_configuration: the synchronisation configuration
     :return:
     """
-    repo_location = checkout(git_configuration)
-    applied_file_syncs: Set[FileSyncConfiguration] = set()
+    repo_location = checkout(git_repository)
+    changed = Changed()
+    changed.files = synchronise_files(repo_location, sync_configuration)
 
-    for file in configuration.files:
-        dest = os.path.join(repo_location, file.dest)
-        target = os.path.join(repo_location, dest)
+    shutil.rmtree(repo_location)
 
-        if ".." in os.path.relpath(dest, repo_location):
+    print(changed.files)
+    return changed
+
+def synchronise_files(repo_location: str, sync_configuration: SyncConfiguration) -> List[str]:
+    """
+    Synchronises files in the given repository, according to the given configuration
+    :param repo_location: the location of the checked out repository
+    :param sync_configurations: the synchronisation configuration
+    :return:
+    """
+    changed_files: List[str] = []
+
+    for file in sync_configuration.files:
+        destination = os.path.join(repo_location, file.destination)
+        target = os.path.join(repo_location, destination)
+
+        if ".." in os.path.relpath(destination, repo_location):
             raise ValueError(f"Destination not inside of repository: {target}")
 
         exists = os.path.exists(target)
-        if exists and not file.override:
-            _logger.info(f"Not overwriting {target} with {file.src}")
+        if exists and not file.overwrite:
+            _logger.info(f"{file.source} != {target} (overwrite={exists})")
             continue
-        assert os.path.isabs(file.src)
+        assert os.path.isabs(file.source)
 
-        if os.path.isfile(file.src) and not filecmp.cmp(file.src, target, shallow=False):
-            shutil.copy(file.src, target)
-            applied_file_syncs.add(file)
+        result = run_ansible_task(dict(
+            action=dict(module="copy", args=dict(src=file.source, dest=target))
+        ))
+        if result.is_failed():
+            raise RuntimeError(result)
+        if result.is_changed():
+            changed_files.append(file.source)
+            _logger.info(f"{file.source} => {target} (overwrite={exists})")
         else:
-            # FIXME: Check if different
-            # TODO: This is a very crude way to mirror files!
-            if os.path.exists(target):
-                shutil.rmtree(target)
-            shutil.copytree(file.src, target)
+            _logger.info(f"{file.source} == {target}")
 
-
-        _logger.info(f"Copied {file.src} => {target} (overwrite={exists})")
-
-    print(repo_location)
-    sleep(1000)
-
+    return changed_files
 
