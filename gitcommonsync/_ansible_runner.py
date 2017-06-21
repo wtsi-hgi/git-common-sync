@@ -43,7 +43,7 @@ class PlaybookOptions(NamedTuple):
     check: bool = False
 
 
-def run(task: Dict, playbook_options: PlaybookOptions=PlaybookOptions()) -> TaskResult:
+def run_ansible_task(task: Dict, playbook_options: PlaybookOptions=PlaybookOptions()) -> TaskResult:
     """
     Run the given description of an Ansible task with the given options.
     :param task: the task to run, represented in a JSON dictionary. e.g.

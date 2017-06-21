@@ -8,31 +8,31 @@ FILES_DIRECTORY_KEY = "files-directory"
 FILES_KEY = "files"
 FILES_SRC_KEY = "src"
 FILES_DEST_KEY = "dest"
-FILES_OVERRIDE_KEY = "override"
+FILES_OVERWRITE_KEY = "overwrite"
 SUBREPOS_KEY = "subrepos"
 SUBREPOS_BRANCH_KEY = "branch"
 SUBREPOS_REMOTE_KEY = "remote"
-SUBREPOS_OVERRIDE_KEY = "override"
+SUBREPOS_OVERWRITE_KEY = "overwrite"
 
 
 class SubRepoSyncConfiguration:
     """
     TODO
     """
-    def __init__(self, remote: str, branch: str, override: bool = False):
+    def __init__(self, remote: str, branch: str, overwrite: bool = False):
         self.remote = remote
         self.branch = branch
-        self.override = override
+        self.overwrite = overwrite
 
 
 class FileSyncConfiguration:
     """
     TODO
     """
-    def __init__(self, src: str, dest: str, override: bool = False):
-        self.src = src
-        self.dest = dest
-        self.override = override
+    def __init__(self, source: str, destination: str, overwrite: bool = False):
+        self.source = source
+        self.destination = destination
+        self.overwrite = overwrite
 
 
 class SyncConfiguration:
@@ -71,16 +71,16 @@ def load(configuration_location: str) -> SyncConfiguration:
             assert os.path.isabs(src)
 
         configuration.files.append(FileSyncConfiguration(
-            src=src,
-            dest=file_as_yml[FILES_DEST_KEY],
-            override=file_as_yml[FILES_OVERRIDE_KEY]
+            source=src,
+            destination=file_as_yml[FILES_DEST_KEY],
+            overwrite=file_as_yml[FILES_OVERWRITE_KEY]
         ))
 
     for subrepo_as_yml in configuration_as_yml[SUBREPOS_KEY]:
         configuration.subrepos.append(SubRepoSyncConfiguration(
             remote=subrepo_as_yml[SUBREPOS_REMOTE_KEY],
             branch=subrepo_as_yml[SUBREPOS_BRANCH_KEY],
-            override=subrepo_as_yml[SUBREPOS_OVERRIDE_KEY]
+            overwrite=subrepo_as_yml[SUBREPOS_OVERWRITE_KEY]
         ))
 
     return configuration
