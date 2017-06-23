@@ -1,9 +1,10 @@
 import os
-from typing import NamedTuple, List
 
 import yaml
 
+from gitcommonsync.models import SubRepoSyncConfiguration, FileSyncConfiguration, SyncConfiguration
 
+NAME_KEY = "name"
 FILES_DIRECTORY_KEY = "files-directory"
 FILES_KEY = "files"
 FILES_SRC_KEY = "src"
@@ -15,51 +16,23 @@ SUBREPOS_REMOTE_KEY = "remote"
 SUBREPOS_OVERWRITE_KEY = "overwrite"
 
 
-class SubRepoSyncConfiguration:
+def load_from_yml(yml_configuration_location: str) -> SyncConfiguration:
     """
     TODO
-    """
-    def __init__(self, remote: str, branch: str, overwrite: bool = False):
-        self.remote = remote
-        self.branch = branch
-        self.overwrite = overwrite
-
-
-class FileSyncConfiguration:
-    """
-    TODO
-    """
-    def __init__(self, source: str, destination: str, overwrite: bool = False):
-        self.source = source
-        self.destination = destination
-        self.overwrite = overwrite
-
-
-class SyncConfiguration:
-    """
-    TODO
-    """
-    def __init__(self, files_directory: str=None, files: List[FileSyncConfiguration]=None,
-                 subrepos: List[SubRepoSyncConfiguration]=None):
-        self.files_directory = files_directory
-        self.files = files if files is not None else []
-        self.subrepos = subrepos if subrepos is not None else []
-
-
-def load(configuration_location: str) -> SyncConfiguration:
-    """
-    TODO
-    :param configuration_location:
+    :param yml_configuration_location:
     :return:
     """
-    with open(configuration_location, "r") as file:
+    with open(yml_configuration_location, "r") as file:
         configuration_as_yml = yaml.load(file)
+
     configuration = SyncConfiguration()
+    configuration.name = configuration_as_yml[NAME_KEY]
     configuration.files_directory = configuration_as_yml[FILES_DIRECTORY_KEY] \
         if FILES_DIRECTORY_KEY in configuration_as_yml else None
+
     if configuration.files_directory is not None and not os.path.isabs(configuration.files_directory):
         configuration.files_directory = os.path.join(
-            os.path.dirname(configuration_location), configuration.files_directory)
+            os.path.dirname(yml_configuration_location), configuration.files_directory)
         assert os.path.isabs(configuration.files_directory)
 
     for file_as_yml in configuration_as_yml[FILES_KEY]:
@@ -84,7 +57,3 @@ def load(configuration_location: str) -> SyncConfiguration:
         ))
 
     return configuration
-
-
-
-
