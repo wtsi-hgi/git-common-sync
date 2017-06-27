@@ -1,10 +1,26 @@
+import os
 import shutil
 from tempfile import mkdtemp
-from typing import List
+from typing import List, Callable, Optional
 
 from git import Repo
 
+from gitcommonsync.models import GitCheckout
+
 DEFAULT_BRANCH = "master"
+
+
+def requires_checkout(func):
+    """
+    TODO
+    :param func:
+    :return:
+    """
+    def decorated(self: GitRepository, *args, **kwargs) -> Callable:
+        if self.checkout_location is not None:
+            raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
+        return func(*args, **kwargs)
+    return decorated
 
 
 class GitRepository:
@@ -25,9 +41,6 @@ class GitRepository:
         TODO
         :return:
         """
-        if self.checkout_location is not None:
-            raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
-
         self.checkout_location = mkdtemp()
         repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location)
 
@@ -45,6 +58,7 @@ class GitRepository:
         repository.heads[self.branch].checkout()
         return self.checkout_location
 
+    @requires_checkout
     def push_changes(self, commit_message: str, changed_files: List[str]):
         """
         TODO
@@ -61,3 +75,36 @@ class GitRepository:
         index.commit(commit_message)
 
         repository.remotes.origin.push()
+
+    @requires_checkout
+    def clone_subrepo(self, checkout: GitCheckout, directory: str):
+        """
+        TODO
+        :param checkout:
+        :param directory:
+        :return:
+        """
+        if os.path.exists(directory):
+            raise ValueError(f"Target directory {directory} already exists")
+        # TODO
+
+    @requires_checkout
+    def get_subrepo(self, directory: str) -> Optional[GitCheckout]:
+        """
+        TODO
+        :param directory:
+        :return:
+        """
+        if not os.path.exists(directory):
+            return None
+        # TODO
+
+    @requires_checkout
+    def pull_subrepo(self, directory: str, commit: str=None) -> bool:
+        """
+        TODO
+        :param directory:
+        :param commit:
+        :return: whether the subrepo was updated
+        """
+        # TODO

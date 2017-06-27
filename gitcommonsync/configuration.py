@@ -2,7 +2,7 @@ import os
 
 import yaml
 
-from gitcommonsync.models import SubRepoSyncConfiguration, FileSyncConfiguration, SyncConfiguration
+from gitcommonsync.models import SubrepoSyncConfiguration, FileSyncConfiguration, SyncConfiguration
 
 NAME_KEY = "name"
 FILES_DIRECTORY_KEY = "files-directory"
@@ -27,20 +27,20 @@ def load_from_yml(yml_configuration_location: str) -> SyncConfiguration:
 
     configuration = SyncConfiguration()
     configuration.name = configuration_as_yml[NAME_KEY]
-    configuration.files_directory = configuration_as_yml[FILES_DIRECTORY_KEY] \
+    files_directory = configuration_as_yml[FILES_DIRECTORY_KEY] \
         if FILES_DIRECTORY_KEY in configuration_as_yml else None
 
-    if configuration.files_directory is not None and not os.path.isabs(configuration.files_directory):
-        configuration.files_directory = os.path.join(
-            os.path.dirname(yml_configuration_location), configuration.files_directory)
-        assert os.path.isabs(configuration.files_directory)
+    if files_directory is not None and not os.path.isabs(files_directory):
+        files_directory = os.path.join(
+            os.path.dirname(yml_configuration_location), files_directory)
+        assert os.path.isabs(files_directory)
 
     for file_as_yml in configuration_as_yml[FILES_KEY]:
         src = file_as_yml[FILES_SRC_KEY]
         if not os.path.isabs(src):
-            if configuration.files_directory is None:
+            if files_directory is None:
                 raise ValueError(f"Absolute file source {src} specified without the files directory being set")
-            src = os.path.join(configuration.files_directory, src)
+            src = os.path.join(files_directory, src)
             assert os.path.isabs(src)
 
         configuration.files.append(FileSyncConfiguration(
@@ -50,7 +50,7 @@ def load_from_yml(yml_configuration_location: str) -> SyncConfiguration:
         ))
 
     for subrepo_as_yml in configuration_as_yml[SUBREPOS_KEY]:
-        configuration.subrepos.append(SubRepoSyncConfiguration(
+        configuration.subrepos.append(SubrepoSyncConfiguration(
             remote=subrepo_as_yml[SUBREPOS_REMOTE_KEY],
             branch=subrepo_as_yml[SUBREPOS_BRANCH_KEY],
             overwrite=subrepo_as_yml[SUBREPOS_OVERWRITE_KEY]
