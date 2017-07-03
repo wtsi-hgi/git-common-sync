@@ -4,8 +4,10 @@ import shutil
 from time import sleep
 from typing import List
 
+import gitsubrepo
+
 from gitcommonsync._ansible_runner import run_ansible_task
-from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration
+from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout
 from gitcommonsync.repository import GitRepository
 
 _logger = logging.getLogger(__name__)
@@ -15,8 +17,9 @@ class Synchronised:
     """
     Changes that happened during the synchronisation.
     """
-    def __init__(self, synchronised_: List[FileSyncConfiguration]=None):
-        self.file_synchronisations = synchronised_ if synchronised_ is not None else []
+    def __init__(self):
+        self.file_synchronisations: List[FileSyncConfiguration] = None
+        self.subrepo_synchronisations: List[SubrepoSyncConfiguration] = None
 
 
 def synchronise(git_repository: GitRepository, sync_configuration: SyncConfiguration) -> Synchronised:
@@ -29,11 +32,14 @@ def synchronise(git_repository: GitRepository, sync_configuration: SyncConfigura
     repository_location = git_repository.checkout()
     changed = Synchronised()
     try:
-        changed.file_synchronisations = synchronise_files(repository_location, sync_configuration.files_directory)
+        changed.file_synchronisations = synchronise_files(repository_location, sync_configuration.files)
+        git_repository.push_changes(
+            f"Synchronised files from the \"{sync_configuration.name}\" configuration",
+            [os.path.join(repository_location, file_synchronisation.destination)
+             for file_synchronisation in changed.file_synchronisations])
 
-        commit_message = f"Synchronised files from the \"{sync_configuration.name}\" configuration"
-        git_repository.push_changes(commit_message, [os.path.join(repository_location, file_synchronisation.destination)
-                                                     for file_synchronisation in changed.file_synchronisations])
+        changed.subrepo_synchronisations = synchronise_subrepos(git_repository, sync_configuration.subrepos)
+        git_repository.push_changes()
     finally:
         git_repository.tear_down()
 
@@ -54,7 +60,7 @@ def synchronise_files(repository_location: str, file_sync_configuration: List[Fi
         destination = os.path.join(repository_location, file_synchronisation.destination)
         target = os.path.join(repository_location, destination)
 
-        if ".." in os.path.relpath(destination, repository_location):
+        if not _is_subdirectory(destination, repository_location):
             raise ValueError(f"Destination {file_synchronisation.destination} not inside of repository "
                              f"({os.path.realpath(target)})")
 
@@ -83,28 +89,68 @@ def synchronise_files(repository_location: str, file_sync_configuration: List[Fi
     return synchronised_files
 
 
-def synchronise_subrepos(repository_location: str, subrepo_sync_configurations: List[SubrepoSyncConfiguration]) \
+def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurations: List[SubrepoSyncConfiguration]) \
         -> List[SubrepoSyncConfiguration]:
     """
     TODO
-    :param repository_location:
+    :param git_repository:
     :param subrepo_sync_configurations:
     :return:
     """
     synchronised_subrepos: List[SubrepoSyncConfiguration] = []
 
     for subrepo_sync_configuration in subrepo_sync_configurations:
-        destination = os.path.join(repository_location, subrepo_sync_configuration.destination)
+        destination = os.path.join(git_repository.checkout_location, subrepo_sync_configuration.checkout.directory)
+        required_checkout = subrepo_sync_configuration.checkout
 
-        if ".." in os.path.relpath(destination, repository_location):
+        if not _is_subdirectory(destination, git_repository.checkout_location):
             raise ValueError(f"Destination {destination} not inside of repository")
 
         if os.path.exists(destination):
-            pass
+            force_update = False
+            url, branch, commit = gitsubrepo.status(destination)
+            current_checkout = GitCheckout(url, branch, commit, required_checkout.directory)
 
+            if current_checkout == required_checkout:
+                _logger.info(f"Subrepo at {required_checkout.directory} is synchronised")
 
+            elif not subrepo_sync_configuration.overwrite:
+                _logger.info(f"Subrepo at {required_checkout.directory} is not synchronised but not updating as "
+                             f"overwrite=False")
 
+            elif current_checkout.url == required_checkout.url and current_checkout.branch == required_checkout.branch:
+                _logger.debug(f"Pulling subrepo at {required_checkout.directory} in an attempt to sync")
+                new_commit = gitsubrepo.pull(destination)
+                if new_commit == subrepo_sync_configuration.checkout.commit:
+                    _logger.info(f"Subrepo at {required_checkout.directory}: {commit} => {new_commit}")
+                    synchronised_subrepos.append(subrepo_sync_configuration)
+                else:
+                    force_update = True
+
+            else:
+                force_update = True
+
+            if force_update:
+                message = "Removing subrepo at {required_checkout.directory} to force update"
+                _logger.debug(f"Removing subrepo at {required_checkout.directory} to force update")
+                shutil.rmtree(destination)
+                git_repository.commit_changes(message, [destination])
+
+        if not os.path.exists(destination):
+            new_commit = gitsubrepo.clone(required_checkout.url, destination,
+                                          branch=required_checkout.branch, commit=required_checkout.commit)
+            assert new_commit != required_checkout.commit
+            _logger.debug(f"Checked out subrepo: {required_checkout}")
+            synchronised_subrepos.append(subrepo_sync_configuration)
 
     return synchronised_subrepos
 
 
+def _is_subdirectory(subdirectory: str, directory: str) -> bool:
+    """
+    TODO
+    :param subdirectory: 
+    :param directory: 
+    :return: 
+    """
+    return not ".." in os.path.relpath(subdirectory, directory)

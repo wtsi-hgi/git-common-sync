@@ -2,7 +2,7 @@ import os
 
 import yaml
 
-from gitcommonsync.models import SubrepoSyncConfiguration, FileSyncConfiguration, SyncConfiguration
+from gitcommonsync.models import SubrepoSyncConfiguration, FileSyncConfiguration, SyncConfiguration, GitCheckout
 
 NAME_KEY = "name"
 FILES_DIRECTORY_KEY = "files-directory"
@@ -13,6 +13,8 @@ FILES_OVERWRITE_KEY = "overwrite"
 SUBREPOS_KEY = "subrepos"
 SUBREPOS_BRANCH_KEY = "branch"
 SUBREPOS_REMOTE_KEY = "remote"
+SUBREPOS_COMMIT_KEY = "commit"
+SUBREPOS_DEST_KEY = "dest"
 SUBREPOS_OVERWRITE_KEY = "overwrite"
 
 
@@ -51,8 +53,12 @@ def load_from_yml(yml_configuration_location: str) -> SyncConfiguration:
 
     for subrepo_as_yml in configuration_as_yml[SUBREPOS_KEY]:
         configuration.subrepos.append(SubrepoSyncConfiguration(
-            remote=subrepo_as_yml[SUBREPOS_REMOTE_KEY],
-            branch=subrepo_as_yml[SUBREPOS_BRANCH_KEY],
+            checkout=GitCheckout(
+                url=subrepo_as_yml[SUBREPOS_REMOTE_KEY],
+                branch=subrepo_as_yml[SUBREPOS_BRANCH_KEY],
+                commit=subrepo_as_yml[SUBREPOS_COMMIT_KEY] if SUBREPOS_COMMIT_KEY in subrepo_as_yml else None,
+                directory=subrepo_as_yml[SUBREPOS_DEST_KEY]
+            ),
             overwrite=subrepo_as_yml[SUBREPOS_OVERWRITE_KEY]
         ))
 

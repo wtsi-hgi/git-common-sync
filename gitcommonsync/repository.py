@@ -1,11 +1,8 @@
-import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Optional
+from typing import List, Callable
 
 from git import Repo
-
-from gitcommonsync.models import GitCheckout
 
 DEFAULT_BRANCH = "master"
 
@@ -16,10 +13,10 @@ def requires_checkout(func):
     :param func:
     :return:
     """
-    def decorated(self: GitRepository, *args, **kwargs) -> Callable:
-        if self.checkout_location is not None:
-            raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
-        return func(*args, **kwargs)
+    def decorated(self: "GitRepository", *args, **kwargs) -> Callable:
+        if self.checkout_location is None:
+            raise NotADirectoryError("Repository must be checked out")
+        return func(self, *args, **kwargs)
     return decorated
 
 
@@ -41,6 +38,9 @@ class GitRepository:
         TODO
         :return:
         """
+        if self.checkout_location is not None:
+            raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
+
         self.checkout_location = mkdtemp()
         repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location)
 
@@ -59,52 +59,28 @@ class GitRepository:
         return self.checkout_location
 
     @requires_checkout
-    def push_changes(self, commit_message: str, changed_files: List[str]):
+    def push_changes(self, commit_message: str=None, changed_files: List[str]=None):
         """
         TODO
         :param commit_message:
         :param changed_files:
         :return:
         """
-        if self.checkout_location is None:
-            raise NotADirectoryError("Repository has not been checked out into a directory")
-
+        if changed_files is not None:
+            self.commit_changes(commit_message, changed_files)
         repository = Repo(self.checkout_location)
-        index = repository.index
-        index.add(changed_files)
-        index.commit(commit_message)
-
         repository.remotes.origin.push()
 
     @requires_checkout
-    def clone_subrepo(self, checkout: GitCheckout, directory: str):
+    def commit_changes(self, commit_message: str, changed_files: List[str]):
         """
         TODO
-        :param checkout:
-        :param directory:
+        :param commit_message:
+        :param changed_files:
         :return:
         """
-        if os.path.exists(directory):
-            raise ValueError(f"Target directory {directory} already exists")
-        # TODO
-
-    @requires_checkout
-    def get_subrepo(self, directory: str) -> Optional[GitCheckout]:
-        """
-        TODO
-        :param directory:
-        :return:
-        """
-        if not os.path.exists(directory):
-            return None
-        # TODO
-
-    @requires_checkout
-    def pull_subrepo(self, directory: str, commit: str=None) -> bool:
-        """
-        TODO
-        :param directory:
-        :param commit:
-        :return: whether the subrepo was updated
-        """
-        # TODO
+        if len(changed_files) > 0:
+            repository = Repo(self.checkout_location)
+            index = repository.index
+            index.add(changed_files)
+            index.commit(commit_message)
