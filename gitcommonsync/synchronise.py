@@ -1,12 +1,12 @@
 import logging
 import os
 import shutil
-from time import sleep
 from typing import List
 
 import gitsubrepo
 
 from gitcommonsync._ansible_runner import run_ansible_task
+from gitcommonsync.common import is_subdirectory
 from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout
 from gitcommonsync.repository import GitRepository
 
@@ -60,7 +60,7 @@ def synchronise_files(repository_location: str, file_sync_configuration: List[Fi
         destination = os.path.join(repository_location, file_synchronisation.destination)
         target = os.path.join(repository_location, destination)
 
-        if not _is_subdirectory(destination, repository_location):
+        if not is_subdirectory(destination, repository_location):
             raise ValueError(f"Destination {file_synchronisation.destination} not inside of repository "
                              f"({os.path.realpath(target)})")
 
@@ -103,12 +103,14 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
         destination = os.path.join(git_repository.checkout_location, subrepo_sync_configuration.checkout.directory)
         required_checkout = subrepo_sync_configuration.checkout
 
-        if not _is_subdirectory(destination, git_repository.checkout_location):
+        if not is_subdirectory(destination, git_repository.checkout_location):
             raise ValueError(f"Destination {destination} not inside of repository")
 
         if os.path.exists(destination):
             force_update = False
             url, branch, commit = gitsubrepo.status(destination)
+            if required_checkout.commit is None:
+                commit = None
             current_checkout = GitCheckout(url, branch, commit, required_checkout.directory)
 
             if current_checkout == required_checkout:
@@ -121,7 +123,7 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
             elif current_checkout.url == required_checkout.url and current_checkout.branch == required_checkout.branch:
                 _logger.debug(f"Pulling subrepo at {required_checkout.directory} in an attempt to sync")
                 new_commit = gitsubrepo.pull(destination)
-                if new_commit == subrepo_sync_configuration.checkout.commit:
+                if new_commit == required_checkout.commit or required_checkout is None:
                     _logger.info(f"Subrepo at {required_checkout.directory}: {commit} => {new_commit}")
                     synchronised_subrepos.append(subrepo_sync_configuration)
                 else:
@@ -131,8 +133,8 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
                 force_update = True
 
             if force_update:
-                message = "Removing subrepo at {required_checkout.directory} to force update"
-                _logger.debug(f"Removing subrepo at {required_checkout.directory} to force update")
+                message = f"Removing subrepo at {required_checkout.directory} to force update"
+                _logger.debug(message)
                 shutil.rmtree(destination)
                 git_repository.commit_changes(message, [destination])
 
@@ -146,11 +148,5 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
     return synchronised_subrepos
 
 
-def _is_subdirectory(subdirectory: str, directory: str) -> bool:
-    """
-    TODO
-    :param subdirectory: 
-    :param directory: 
-    :return: 
-    """
-    return not ".." in os.path.relpath(subdirectory, directory)
+
+

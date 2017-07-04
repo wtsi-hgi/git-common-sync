@@ -1,3 +1,4 @@
+import os
 import shutil
 from tempfile import mkdtemp
 from typing import List, Callable
@@ -80,7 +81,11 @@ class GitRepository:
         :return:
         """
         if len(changed_files) > 0:
+            added = {changed_file for changed_file in changed_files if os.path.exists(changed_file)}
+            removed = set(changed_files) - added
+
             repository = Repo(self.checkout_location)
             index = repository.index
-            index.add(changed_files)
+            index.add(added)
+            index.remove(removed, r=True)
             index.commit(commit_message)
