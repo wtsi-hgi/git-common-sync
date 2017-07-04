@@ -30,20 +30,22 @@ class _ResultCallback(CallbackBase):
         self.result = result
 
 
-class PlaybookOptions(NamedTuple):
+class PlaybookOptions:
     """
     Ansible playbook options.
     """
-    connection: str = "local"
-    module_path: str = None
-    forks: int = 100
-    become: bool = False
-    become_method: str = None
-    become_user: str = None
-    check: bool = False
+    def __init__(self, *, connection: str="local", module_path: str=None, forks: int=100, become: bool=False,
+                 become_method: str=None, become_user: str=None, check: bool=False):
+        self.connection = connection
+        self.module_path = module_path
+        self.forks = forks
+        self.become = become
+        self.become_method = become_method
+        self.become_user = become_user
+        self.check = check
 
 
-def run_ansible_task(task: Dict, playbook_options: PlaybookOptions=PlaybookOptions()) -> TaskResult:
+def run_ansible_task(task: Dict, playbook_options: PlaybookOptions=None) -> TaskResult:
     """
     Run the given description of an Ansible task with the given options.
     :param task: the task to run, represented in a JSON dictionary. e.g.
@@ -53,6 +55,9 @@ def run_ansible_task(task: Dict, playbook_options: PlaybookOptions=PlaybookOptio
     :param playbook_options: options to use when running Ansible playbook
     :return: the results of running the task
     """
+    if playbook_options is None:
+        playbook_options = PlaybookOptions()
+
     variable_manager = VariableManager()
     loader = DataLoader()
     results_callback = _ResultCallback()
