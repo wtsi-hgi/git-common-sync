@@ -86,6 +86,8 @@ class GitRepository:
 
             repository = Repo(self.checkout_location)
             index = repository.index
-            index.add(added)
-            index.remove(removed, r=True)
+            if len(added) > 0:
+                index.add(added)
+            if len(removed) > 0:
+                index.remove(removed, r=True)
             index.commit(commit_message)

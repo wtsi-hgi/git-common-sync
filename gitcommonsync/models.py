@@ -3,7 +3,7 @@ from typing import List, Any
 
 class GitCheckout:
     """
-    TODO
+    Git checkout.
     """
     def __init__(self, url: str, branch: str, commit: str, directory: str):
         self.url = url

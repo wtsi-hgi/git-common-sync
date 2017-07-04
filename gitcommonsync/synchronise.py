@@ -6,9 +6,9 @@ from typing import List
 import gitsubrepo
 
 from gitcommonsync._ansible_runner import run_ansible_task
-from gitcommonsync.common import is_subdirectory
+from gitcommonsync._common import is_subdirectory
 from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout
-from gitcommonsync.repository import GitRepository
+from gitcommonsync._repository import GitRepository
 
 _logger = logging.getLogger(__name__)
 
@@ -22,53 +22,50 @@ class Synchronised:
         self.subrepo_synchronisations: List[SubrepoSyncConfiguration] = None
 
 
-def synchronise(git_repository: GitRepository, sync_configuration: SyncConfiguration) -> Synchronised:
+def synchronise(repository: GitRepository, sync_configuration: SyncConfiguration) -> Synchronised:
     """
     Clones, updates and commits to the given repository, according to the given synchronisation configuration.
-    :param git_repository: the git repository
+    :param repository: the git repository
     :param sync_configuration: the synchronisation configuration
     :return: TODO
     """
-    repository_location = git_repository.checkout()
+    repository.checkout()
     changed = Synchronised()
     try:
-        changed.file_synchronisations = synchronise_files(repository_location, sync_configuration.files)
-        git_repository.push_changes(
-            f"Synchronised files from the \"{sync_configuration.name}\" configuration",
-            [os.path.join(repository_location, file_synchronisation.destination)
-             for file_synchronisation in changed.file_synchronisations])
-
-        changed.subrepo_synchronisations = synchronise_subrepos(git_repository, sync_configuration.subrepos)
-        git_repository.push_changes()
+        changed.file_synchronisations = synchronise_files(repository, sync_configuration.files)
+        changed.subrepo_synchronisations = synchronise_subrepos(repository, sync_configuration.subrepos)
     finally:
-        git_repository.tear_down()
+        repository.tear_down()
 
     return changed
 
 
-def synchronise_files(repository_location: str, file_sync_configuration: List[FileSyncConfiguration]) \
+def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration]) \
         -> List[FileSyncConfiguration]:
     """
     Synchronises files in the given repository, according to the given configuration
-    :param repository_location: the location of the checked out repository
-    :param file_sync_configuration: the file synchronisation configurations
+    :param repository: the location of the checked out repository
+    :param configurations: the file synchronisation configurations
     :return: the file synchronisations applied
     """
-    synchronised_files: List[FileSyncConfiguration] = []
+    synchronised: List[FileSyncConfiguration] = []
 
-    for file_synchronisation in file_sync_configuration:
-        destination = os.path.join(repository_location, file_synchronisation.destination)
-        target = os.path.join(repository_location, destination)
+    for configuration in configurations:
+        destination = os.path.join(repository.checkout_location, configuration.destination)
+        target = os.path.join(repository.checkout_location, destination)
 
-        if not is_subdirectory(destination, repository_location):
-            raise ValueError(f"Destination {file_synchronisation.destination} not inside of repository "
+        if not is_subdirectory(destination, repository.checkout_location):
+            raise ValueError(f"Destination {configuration.destination} not inside of repository "
                              f"({os.path.realpath(target)})")
 
+        if not os.path.exists(configuration.source):
+            raise FileNotFoundError(configuration.source)
+
         exists = os.path.exists(target)
-        if exists and not file_synchronisation.overwrite:
-            _logger.info(f"{file_synchronisation.source} != {target} (overwrite={file_synchronisation.overwrite})")
+        if exists and not configuration.overwrite:
+            _logger.info(f"{configuration.source} != {target} (overwrite={configuration.overwrite})")
             continue
-        assert os.path.isabs(file_synchronisation.source)
+        assert os.path.isabs(configuration.source)
 
         intermediate_directories = os.path.dirname(target)
         if not os.path.exists(intermediate_directories):
@@ -76,34 +73,39 @@ def synchronise_files(repository_location: str, file_sync_configuration: List[Fi
             os.makedirs(intermediate_directories)
 
         result = run_ansible_task(dict(
-            action=dict(module="copy", args=dict(src=file_synchronisation.source, dest=target))
+            action=dict(module="copy", args=dict(src=configuration.source, dest=target))
         ))
         if result.is_failed():
             raise RuntimeError(result._result)
         if result.is_changed():
-            synchronised_files.append(file_synchronisation)
-            _logger.info(f"{file_synchronisation.source} => {target} (overwrite={file_synchronisation.overwrite})")
+            synchronised.append(configuration)
+            _logger.info(f"{configuration.source} => {target} (overwrite={configuration.overwrite})")
         else:
-            _logger.info(f"{file_synchronisation.source} == {target}")
+            _logger.info(f"{configuration.source} == {target}")
 
-    return synchronised_files
+    repository.push_changes(
+        f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
+        [os.path.join(repository.checkout_location, file_synchronisation.destination)
+         for file_synchronisation in synchronised])
+
+    return synchronised
 
 
-def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurations: List[SubrepoSyncConfiguration]) \
+def synchronise_subrepos(repository: GitRepository, configurations: List[SubrepoSyncConfiguration]) \
         -> List[SubrepoSyncConfiguration]:
     """
     TODO
-    :param git_repository:
-    :param subrepo_sync_configurations:
+    :param repository:
+    :param configurations:
     :return:
     """
-    synchronised_subrepos: List[SubrepoSyncConfiguration] = []
+    synchronised: List[SubrepoSyncConfiguration] = []
 
-    for subrepo_sync_configuration in subrepo_sync_configurations:
-        destination = os.path.join(git_repository.checkout_location, subrepo_sync_configuration.checkout.directory)
-        required_checkout = subrepo_sync_configuration.checkout
+    for configuration in configurations:
+        destination = os.path.join(repository.checkout_location, configuration.checkout.directory)
+        required_checkout = configuration.checkout
 
-        if not is_subdirectory(destination, git_repository.checkout_location):
+        if not is_subdirectory(destination, repository.checkout_location):
             raise ValueError(f"Destination {destination} not inside of repository")
 
         if os.path.exists(destination):
@@ -116,7 +118,7 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
             if current_checkout == required_checkout:
                 _logger.info(f"Subrepo at {required_checkout.directory} is synchronised")
 
-            elif not subrepo_sync_configuration.overwrite:
+            elif not configuration.overwrite:
                 _logger.info(f"Subrepo at {required_checkout.directory} is not synchronised but not updating as "
                              f"overwrite=False")
 
@@ -125,7 +127,7 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
                 new_commit = gitsubrepo.pull(destination)
                 if new_commit == required_checkout.commit or required_checkout is None:
                     _logger.info(f"Subrepo at {required_checkout.directory}: {commit} => {new_commit}")
-                    synchronised_subrepos.append(subrepo_sync_configuration)
+                    synchronised.append(configuration)
                 else:
                     force_update = True
 
@@ -136,17 +138,15 @@ def synchronise_subrepos(git_repository: GitRepository, subrepo_sync_configurati
                 message = f"Removing subrepo at {required_checkout.directory} to force update"
                 _logger.debug(message)
                 shutil.rmtree(destination)
-                git_repository.commit_changes(message, [destination])
+                repository.commit_changes(message, [destination])
 
         if not os.path.exists(destination):
             new_commit = gitsubrepo.clone(required_checkout.url, destination,
                                           branch=required_checkout.branch, commit=required_checkout.commit)
             assert new_commit != required_checkout.commit
             _logger.debug(f"Checked out subrepo: {required_checkout}")
-            synchronised_subrepos.append(subrepo_sync_configuration)
+            synchronised.append(configuration)
 
-    return synchronised_subrepos
+    repository.push_changes()
 
-
-
-
+    return synchronised

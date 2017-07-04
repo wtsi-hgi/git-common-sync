@@ -8,4 +8,4 @@ def is_subdirectory(subdirectory: str, directory: str) -> bool:
     :param directory: the directory that may contain the subdirectory
     :return: whether the subdirectory is a subdirectory of the directory
     """
-    return not ".." in os.path.relpath(subdirectory, directory)
+    return ".." not in os.path.relpath(subdirectory, directory)
