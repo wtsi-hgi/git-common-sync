@@ -51,15 +51,15 @@ def synchronise_files(repository: GitRepository, configurations: List[FileSyncCo
     synchronised: List[FileSyncConfiguration] = []
 
     for configuration in configurations:
+        if not os.path.exists(configuration.source):
+            raise FileNotFoundError(configuration.source)
+
         destination = os.path.join(repository.checkout_location, configuration.destination)
         target = os.path.join(repository.checkout_location, destination)
 
         if not is_subdirectory(destination, repository.checkout_location):
             raise ValueError(f"Destination {configuration.destination} not inside of repository "
                              f"({os.path.realpath(target)})")
-
-        if not os.path.exists(configuration.source):
-            raise FileNotFoundError(configuration.source)
 
         exists = os.path.exists(target)
         if exists and not configuration.overwrite:
@@ -73,7 +73,9 @@ def synchronise_files(repository: GitRepository, configurations: List[FileSyncCo
             os.makedirs(intermediate_directories)
 
         result = run_ansible_task(dict(
-            action=dict(module="copy", args=dict(src=configuration.source, dest=target))
+            action=dict(module="synchronize", args=dict(
+                src=configuration.source, dest=target, recursive=True, delete=True)
+            )
         ))
         if result.is_failed():
             raise RuntimeError(result._result)
