@@ -5,6 +5,7 @@ import tarfile
 import unittest
 from tempfile import mkdtemp, mkstemp
 from typing import Tuple
+import stat
 
 from checksumdir import dirhash
 from git import Repo
@@ -41,7 +42,8 @@ class _TestWithGitRepository(unittest.TestCase):
     def create_test_file(self, contents=CONTENTS, directory: str=None) -> Tuple[str, str]:
         directory = directory if directory is not None else self.temp_directory
         _, location = mkstemp(dir=directory)
-        open(location, "w").write(contents)
+        with open(location, "w") as file:
+            file.write(contents)
         return location, get_md5(location)
 
     def create_test_directory(self, contains_n_files: int=3) -> Tuple[str, str]:
@@ -79,8 +81,6 @@ class TestSynchroniseFiles(_TestWithGitRepository):
         synchronised = synchronise_files(self.git_repository, configuration)
         self.assertEqual(0, len(synchronised))
 
-    # TODO: Test sync if execution bit changed
-
     def test_sync_up_to_date_directory(self):
         source = os.path.join(self.temp_directory, DIRECTORY_1) + os.path.sep
         destination = os.path.join(self.git_directory, DIRECTORY_1)
@@ -105,6 +105,14 @@ class TestSynchroniseFiles(_TestWithGitRepository):
         synchronised = synchronise_files(self.git_repository, configurations)
         self.assertEqual(configurations, synchronised)
         self.assertEqual(source_md5, get_md5(source))
+        self.assertEqual(get_md5(source), get_md5(destination))
+
+    def test_sync_with_new_intermediate_directories(self):
+        source, source_md5 = self.create_test_file()
+        destination = os.path.join(self.git_directory, NEW_DIRECTORY_1, NEW_FILE_1)
+        configurations = [FileSyncConfiguration(source, destination, overwrite=False)]
+        synchronised = synchronise_files(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
         self.assertEqual(get_md5(source), get_md5(destination))
 
     def test_sync_out_of_date_file_when_no_overwrite(self):
@@ -145,7 +153,17 @@ class TestSynchroniseFiles(_TestWithGitRepository):
         self.assertEqual(source_md5, get_md5(source))
         self.assertEqual(get_md5(source), get_md5(destination))
 
-    # TODO: Directory test...
+    def test_sync_permissions_change(self):
+        destination = os.path.join(self.git_directory, FILE_1)
+        source, _ = self.create_test_file()
+        shutil.copy(destination, source)
+        permissions = 770
+        os.chmod(source, permissions)
+        assert stat.S_IMODE(os.lstat(source).st_mode) == 770
+        configurations = [FileSyncConfiguration(source, destination, overwrite=True)]
+        synchronised = synchronise_files(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        self.assertEqual(770, stat.S_IMODE(os.lstat(destination).st_mode))
 
 
 def get_md5(file_location: str) -> str:
@@ -155,6 +173,8 @@ def get_md5(file_location: str) -> str:
     :return:
     """
     if os.path.isfile(file_location):
-        return hashlib.md5(open(file_location, "rb").read()).hexdigest()
+        with open(file_location, "rb") as file:
+            content = file.read()
+        return hashlib.md5(content).hexdigest()
     else:
         return dirhash(file_location, "md5")
