@@ -1,29 +1,19 @@
-dist: trusty
-sudo : required
+sudo: required
+
 language: python
 
 python:
   - 3.6
 
-addons:
-  apt:
-    packages:
-      - git
-      - build-essential
+services:
+  - docker
 
 before_install:
-  - pip install codecov coverage
-  - git clone --branch=master --depth=1 https://github.com/ingydotnet/git-subrepo /tmp/git-subrepo && cd /tmp/git-subrepo && sudo make install && cd -
-
-install:
-  - pip install -r test_requirements.txt
-  - pip install -r requirements.txt
+  - docker build -t testing-image -f Dockerfile.test .
+  - pip install codecov
 
 script:
-  - PYTHONPATH=. coverage run -m unittest discover -v -s gitcommonsync/tests
-  - coverage run setup.py install
-  - coverage combine -a
-  - coverage report
+  - docker run -v $PWD:/data -w /data testing-image ./test-runner.sh
 
 after_success:
   - codecov
