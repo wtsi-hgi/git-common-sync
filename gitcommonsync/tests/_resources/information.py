@@ -8,6 +8,10 @@ BRANCH = "master"
 FILE_1 = "update.txt"
 DIRECTORY_1 = "a"
 
+
+GIT_BRANCH = "master"
+GIT_COMMIT = "cd682d66c4f5b9bdd5a618ecf3b8af2bf6f57f1a"
+
 # TODO: Remove unused
 # TEST_TAG = "1.0"
 # TEST_TAG_COMMIT = "e22fcb9"

@@ -4,6 +4,7 @@ import shutil
 import tarfile
 import unittest
 from tempfile import mkdtemp, mkstemp
+from time import sleep
 from typing import Tuple
 import stat
 
@@ -11,10 +12,10 @@ from checksumdir import dirhash
 from git import Repo
 
 from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import FileSyncConfiguration
-from gitcommonsync.synchronise import synchronise_files
+from gitcommonsync.models import FileSyncConfiguration, SubrepoSyncConfiguration, GitCheckout
+from gitcommonsync.synchronise import synchronise_files, synchronise_subrepos
 from gitcommonsync.tests._resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
-    BRANCH, DIRECTORY_1
+    BRANCH, DIRECTORY_1, GIT_BRANCH, GIT_COMMIT
 
 NEW_FILE_1 = "new-file.txt"
 NEW_DIRECTORY_1 = "new-directory"
@@ -30,11 +31,12 @@ class _TestWithGitRepository(unittest.TestCase):
 
         with tarfile.open(EXTERNAL_REPOSITORY_ARCHIVE) as archive:
             archive.extractall(path=self.temp_directory)
-        external_git_repository = os.path.join(self.temp_directory, EXTERNAL_REPOSITORY_NAME)
-        self.external_git_repository = Repo(external_git_repository)
+        self.external_git_repository_location = os.path.join(self.temp_directory, EXTERNAL_REPOSITORY_NAME)
+        self.external_git_repository = Repo(self.external_git_repository_location)
 
-        self.git_repository = GitRepository(external_git_repository, BRANCH)
+        self.git_repository = GitRepository(self.external_git_repository_location, BRANCH)
         self.git_directory = self.git_repository.checkout()
+        self.external_git_repository_md5 = get_md5(self.git_directory)
 
     def tearDown(self):
         shutil.rmtree(self.temp_directory)
@@ -166,15 +168,36 @@ class TestSynchroniseFiles(_TestWithGitRepository):
         self.assertEqual(770, stat.S_IMODE(os.lstat(destination).st_mode))
 
 
-def get_md5(file_location: str) -> str:
+class TestSynchroniseSubrepos(_TestWithGitRepository):
     """
     TODO
-    :param file_location:
-    :return:
     """
-    if os.path.isfile(file_location):
-        with open(file_location, "rb") as file:
+    def setUp(self):
+        super().setUp()
+        self.git_checkout = GitCheckout(self.external_git_repository_location, GIT_BRANCH, GIT_COMMIT, NEW_DIRECTORY_1)
+        self.git_subrepo_directory = os.path.join(self.git_directory, self.git_checkout.directory)
+
+    def test_sync_new_subrepo(self):
+        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        print()
+        print()
+        self.assertEqual(self.external_git_repository_md5, get_md5(self.git_subrepo_directory))
+
+    # TODO: Relative and absolute path checkout
+
+
+def get_md5(location: str, ignore_hidden_files: bool=True) -> str:
+    """
+    Gets an MD5 checksum of the file or directory at the given location.
+    :param location: location of file or directory
+    :param ignore_hidden_files: whether hidden files should be ignored when calculating an checksum for a directory
+    :return: the MD5 checksum
+    """
+    if os.path.isfile(location):
+        with open(location, "rb") as file:
             content = file.read()
         return hashlib.md5(content).hexdigest()
     else:
-        return dirhash(file_location, "md5")
+        return dirhash(location, "md5", ignore_hidden=ignore_hidden_files)
