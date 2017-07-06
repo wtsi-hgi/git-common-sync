@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Set, Dict
 
 
 class GitCheckout:
@@ -38,13 +38,22 @@ class FileSyncConfiguration:
         self.overwrite = overwrite
 
 
+class TemplateSyncConfiguration(FileSyncConfiguration):
+    """
+    Template synchronisation configuration.
+    """
+    def __init__(self, source: str, destination: str, variables: Dict[str, str], overwrite: bool=False):
+        super().__init__(source, destination, overwrite=overwrite)
+        self.variables = variables
+
+
 class SyncConfiguration:
     """
     All synchronisation configurations.
     """
     def __init__(self, name: str=None, files: List[FileSyncConfiguration]=None,
-                 subrepos: List[SubrepoSyncConfiguration]=None):
+                 subrepos: List[SubrepoSyncConfiguration]=None, templates: List[TemplateSyncConfiguration]=None):
         self.name = name
         self.files = files if files is not None else []
         self.subrepos = subrepos if subrepos is not None else []
-
+        self.templates = templates if templates is not None else []

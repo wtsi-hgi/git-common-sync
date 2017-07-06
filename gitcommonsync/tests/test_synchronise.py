@@ -1,4 +1,4 @@
-import os
+import json
 import os
 import shutil
 import stat
@@ -6,15 +6,16 @@ import tarfile
 import unittest
 from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from typing import Tuple
+from typing import Tuple, Dict
 
 import gitsubrepo
 from git import Repo
 from gitsubrepo.exceptions import NotAGitSubrepoException
 
+from gitcommonsync._ansible_runner import run_ansible_task, ANSIBLE_TEMPLATE_MODULE_NAME
 from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import FileSyncConfiguration, SubrepoSyncConfiguration, GitCheckout
-from gitcommonsync.synchronise import synchronise_files, synchronise_subrepos
+from gitcommonsync.models import FileSyncConfiguration, SubrepoSyncConfiguration, GitCheckout, TemplateSyncConfiguration
+from gitcommonsync.synchronise import synchronise_files, synchronise_subrepos, synchronise_templates
 from gitcommonsync.tests._common import get_md5
 from gitcommonsync.tests._resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
     BRANCH, DIRECTORY_1, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH
@@ -22,6 +23,11 @@ from gitcommonsync.tests._resources.information import EXTERNAL_REPOSITORY_ARCHI
 NEW_FILE_1 = "new-file.txt"
 NEW_DIRECTORY_1 = "new-directory"
 CONTENTS = "test contents"
+TEMPLATE_VARIABLES = {
+    "foo": "123",
+    "bar": "abc"
+}
+TEMPLATE = {parameter: "{{ %s }}" % parameter for parameter in TEMPLATE_VARIABLES.keys()}
 
 
 class _TestWithGitRepository(unittest.TestCase):
@@ -244,3 +250,63 @@ class TestSynchroniseSubrepos(_TestWithGitRepository):
         url, branch, commit = gitsubrepo.status(self.git_subrepo_directory)
         self.assertEqual(GIT_MASTER_HEAD_COMMIT[0:7], commit)
         self.assertEqual(GIT_MASTER_BRANCH, branch)
+
+
+class TestSynchroniseTemplates(_TestWithGitRepository):
+    """
+    Tests for `synchronise_templates`.
+    """
+    def setUp(self):
+        super().setUp()
+        self.template_source, _ = self.create_test_file(contents=json.dumps(TEMPLATE))
+        self.template_destination = os.path.join(self.git_directory, NEW_FILE_1)
+
+    def test_sync_template_with_incomplete_variables(self):
+        configurations = [TemplateSyncConfiguration(self.template_source, self.template_destination, variables={})]
+        self.assertRaises(RuntimeError, synchronise_templates, self.git_repository, configurations)
+
+    def test_sync_new_template(self):
+        configurations = [TemplateSyncConfiguration(
+            self.template_source, self.template_destination, variables=TEMPLATE_VARIABLES)]
+        synchronised = synchronise_templates(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        self.assertTrue(os.path.exists(self.template_destination))
+        with open(self.template_destination, "r") as file:
+            self.assertEqual(TEMPLATE_VARIABLES, json.load(file))
+
+    def test_sync_up_to_date_template(self):
+        self._write_template()
+        configurations = [TemplateSyncConfiguration(
+            self.template_source, self.template_destination, variables=TEMPLATE_VARIABLES, overwrite=True)]
+        synchronised = synchronise_templates(self.git_repository, configurations)
+        self.assertEqual([], synchronised)
+
+    def test_sync_out_of_date_date_template_without_overwrite(self):
+        self._write_template()
+        altered_variables = {key: f"{value}-2" for key, value in TEMPLATE_VARIABLES.items()}
+        configurations = [TemplateSyncConfiguration(
+            self.template_source, self.template_destination, variables=altered_variables, overwrite=False)]
+        synchronised = synchronise_templates(self.git_repository, configurations)
+        self.assertEqual([], synchronised)
+
+    def test_sync_out_of_date_date_template_with_overwrite(self):
+        self._write_template()
+        altered_variables = {key: f"{value}-2" for key, value in TEMPLATE_VARIABLES.items()}
+        configurations = [TemplateSyncConfiguration(
+            self.template_source, self.template_destination, variables=altered_variables, overwrite=True)]
+        synchronised = synchronise_templates(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        with open(self.template_destination, "r") as file:
+            self.assertEqual(altered_variables, json.load(file))
+
+    def _write_template(self, template_variables: Dict[str, str]=TEMPLATE_VARIABLES):
+        """
+        TODO
+        :param template_variables:
+        :return:
+        """
+        run_ansible_task(
+            dict(action=dict(module=ANSIBLE_TEMPLATE_MODULE_NAME,
+                             args=dict(src=self.template_source, dest=self.template_destination))),
+            template_variables
+        )

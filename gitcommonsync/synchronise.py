@@ -1,17 +1,20 @@
 import logging
 import os
 import shutil
-from typing import List
+from typing import List, Dict, Callable, Type
 
 import gitsubrepo
 from git import Repo
 
-from gitcommonsync._ansible_runner import run_ansible_task
+from gitcommonsync._ansible_runner import run_ansible_task, ANSIBLE_RSYNC_MODULE_NAME, ANSIBLE_TEMPLATE_MODULE_NAME
 from gitcommonsync._common import is_subdirectory
-from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout
+from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout, \
+    TemplateSyncConfiguration
 from gitcommonsync._repository import GitRepository
 
 _logger = logging.getLogger(__name__)
+
+FileSyncConfigurationType = Type("FileSyncConfigurationType", bound=FileSyncConfiguration)
 
 
 class Synchronised:
@@ -21,79 +24,28 @@ class Synchronised:
     def __init__(self):
         self.file_synchronisations: List[FileSyncConfiguration] = None
         self.subrepo_synchronisations: List[SubrepoSyncConfiguration] = None
+        self.template_synchronisations: List[TemplateSyncConfiguration] = None
 
 
-def synchronise(repository: GitRepository, sync_configuration: SyncConfiguration) -> Synchronised:
+def synchronise(repository: GitRepository, configuration: SyncConfiguration) -> Synchronised:
     """
     Clones, updates and commits to the given repository, according to the given synchronisation configuration.
     :param repository: the git repository
-    :param sync_configuration: the synchronisation configuration
+    :param configuration: the synchronisation configuration
     :return: TODO
     """
     repository.checkout()
     changed = Synchronised()
     try:
-        changed.file_synchronisations = synchronise_files(repository, sync_configuration.files)
-        changed.subrepo_synchronisations = synchronise_subrepos(repository, sync_configuration.subrepos)
+        changed.subrepo_synchronisations = synchronise_subrepos(repository, configuration.subrepos)
+        changed.file_synchronisations = synchronise_files(repository, configuration.files)
+        changed.template_synchronisations = synchronise_templates(repository, configuration.templates)
     finally:
         repository.tear_down()
-
     return changed
 
 
-def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration]) \
-        -> List[FileSyncConfiguration]:
-    """
-    Synchronises files in the given repository, according to the given configuration
-    :param repository: the location of the checked out repository
-    :param configurations: the file synchronisation configurations
-    :return: the file synchronisations applied
-    """
-    synchronised: List[FileSyncConfiguration] = []
-
-    for configuration in configurations:
-        if not os.path.exists(configuration.source):
-            raise FileNotFoundError(configuration.source)
-
-        destination = os.path.join(repository.checkout_location, configuration.destination)
-        target = os.path.join(repository.checkout_location, destination)
-
-        if not is_subdirectory(destination, repository.checkout_location):
-            raise ValueError(f"Destination {configuration.destination} not inside of repository "
-                             f"({os.path.realpath(target)})")
-
-        exists = os.path.exists(target)
-        if exists and not configuration.overwrite:
-            _logger.info(f"{configuration.source} != {target} (overwrite={configuration.overwrite})")
-            continue
-        assert os.path.isabs(configuration.source)
-
-        intermediate_directories = os.path.dirname(target)
-        if not os.path.exists(intermediate_directories):
-            _logger.info(f"Creating intermediate directories: {intermediate_directories}")
-            os.makedirs(intermediate_directories)
-
-        result = run_ansible_task(dict(
-            action=dict(module="synchronize", args=dict(
-                src=configuration.source, dest=target, recursive=True, delete=True)
-            )
-        ))
-        if result.is_failed():
-            raise RuntimeError(result._result)
-        if result.is_changed():
-            synchronised.append(configuration)
-            _logger.info(f"{configuration.source} => {target} (overwrite={configuration.overwrite})")
-        else:
-            _logger.info(f"{configuration.source} == {target}")
-
-    repository.push_changes(
-        f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
-        [os.path.join(repository.checkout_location, file_synchronisation.destination)
-         for file_synchronisation in synchronised])
-
-    return synchronised
-
-
+# XXX: It would be possible to write an Ansible module for subrepo using this...
 def synchronise_subrepos(repository: GitRepository, configurations: List[SubrepoSyncConfiguration]) \
         -> List[SubrepoSyncConfiguration]:
     """
@@ -154,5 +106,97 @@ def synchronise_subrepos(repository: GitRepository, configurations: List[Subrepo
             synchronised.append(configuration)
 
     repository.push_changes()
+
+    return synchronised
+
+
+def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration]) \
+        -> List[FileSyncConfiguration]:
+    """
+    Synchronises files in the given repository, according to the given configuration
+    :param repository: the location of the checked out repository
+    :param configurations: the file synchronisation configurations
+    :return: the synchronisations applied
+    """
+    return _synchronise_files(
+        repository,
+        configurations,
+        lambda configuration, target: dict(
+            module=ANSIBLE_RSYNC_MODULE_NAME, args=dict(src=configuration.source, dest=target, recursive=True,
+                                                        delete=True)
+        )
+    )
+
+
+def synchronise_templates(repository: GitRepository, configurations: List[TemplateSyncConfiguration]) \
+        -> List[TemplateSyncConfiguration]:
+    """
+    TODO
+    :param repository: the location of the checked out repository
+    :param configurations: the file template synchronisation configurations
+    :return: the synchronisations applied
+    """
+    # FIXME: The loss of type here indicates this should be refactored into a generic class based form
+    return _synchronise_files(
+        repository,
+        configurations,
+        lambda configuration, target: dict(
+            module=ANSIBLE_TEMPLATE_MODULE_NAME, args=dict(src=configuration.source, dest=target)
+        ),
+        lambda configuration: configuration.variables
+    )
+
+
+def _synchronise_files(
+        repository: GitRepository, configurations: List[FileSyncConfiguration],
+        ansible_action_generator: Callable[[FileSyncConfiguration, str], Dict],
+        ansible_variables_generator: Callable[[FileSyncConfiguration, str], Dict[str, str]]=lambda configuration: {}) \
+        -> List[FileSyncConfiguration]:
+    """
+    TODO.
+    :param repository: the location of the checked out repository
+    :param configurations: TODO
+    :param ansible_action_generator: TODO
+    :param ansible_variables_generator: TODO
+    :return: the synchronisations applied
+    """
+    synchronised: List[FileSyncConfigurationType] = []
+
+    for configuration in configurations:
+        if not os.path.exists(configuration.source):
+            raise FileNotFoundError(configuration.source)
+
+        destination = os.path.join(repository.checkout_location, configuration.destination)
+        target = os.path.join(repository.checkout_location, destination)
+
+        if not is_subdirectory(destination, repository.checkout_location):
+            raise ValueError(f"Destination {configuration.destination} not inside of repository "
+                             f"({os.path.realpath(target)})")
+
+        exists = os.path.exists(target)
+        if exists and not configuration.overwrite:
+            _logger.info(f"{configuration.source} != {target} (overwrite={configuration.overwrite})")
+            continue
+        assert os.path.isabs(configuration.source)
+
+        intermediate_directories = os.path.dirname(target)
+        if not os.path.exists(intermediate_directories):
+            _logger.info(f"Creating intermediate directories: {intermediate_directories}")
+            os.makedirs(intermediate_directories)
+
+        result = run_ansible_task(dict(action=ansible_action_generator(configuration, target)),
+                                  ansible_variables_generator(configuration))
+        if result.is_failed():
+            raise RuntimeError(result._result)
+        if result.is_changed():
+            synchronised.append(configuration)
+            _logger.info(f"{configuration.source} => {target} (overwrite={configuration.overwrite})")
+        else:
+            _logger.info(f"{configuration.source} == {target}")
+
+    repository.push_changes(
+        f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
+        [os.path.join(repository.checkout_location, file_synchronisation.destination)
+         for file_synchronisation in synchronised])
 
     return synchronised

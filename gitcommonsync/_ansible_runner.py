@@ -1,4 +1,4 @@
-from typing import NamedTuple, Dict
+from typing import  Dict
 
 from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible.executor.task_result import TaskResult
@@ -7,6 +7,9 @@ from ansible.parsing.dataloader import DataLoader
 from ansible.playbook.play import Play
 from ansible.plugins.callback import CallbackBase
 from ansible.vars import VariableManager
+
+ANSIBLE_TEMPLATE_MODULE_NAME = "template"
+ANSIBLE_RSYNC_MODULE_NAME = "synchronize"
 
 
 class AnsibleRuntimeException(RuntimeError):
@@ -45,20 +48,24 @@ class PlaybookOptions:
         self.check = check
 
 
-def run_ansible_task(task: Dict, playbook_options: PlaybookOptions=None) -> TaskResult:
+def run_ansible_task(task: Dict, variables: Dict[str, str]=None, playbook_options: PlaybookOptions=None) -> TaskResult:
     """
     Run the given description of an Ansible task with the given options.
     :param task: the task to run, represented in a JSON dictionary. e.g.
     ```
     dict(action=dict(module="file", args=dict(path="/testing", state="directory"), register="testing_created")
     ```
+    :param variables: Ansible variables (key-value pairs)
     :param playbook_options: options to use when running Ansible playbook
     :return: the results of running the task
     """
+    if variables is None:
+        variables = {}
     if playbook_options is None:
         playbook_options = PlaybookOptions()
 
     variable_manager = VariableManager()
+    variable_manager.extra_vars = variables
     loader = DataLoader()
     results_callback = _ResultCallback()
 
