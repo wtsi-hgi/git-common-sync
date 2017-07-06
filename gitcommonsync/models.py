@@ -28,6 +28,7 @@ class SubrepoSyncConfiguration:
         self.overwrite = overwrite
 
 
+# TODO: Extract shared superclass for this and `TemplateSyncConfiguration`
 class FileSyncConfiguration:
     """
     File synchronisation configuration.
@@ -51,9 +52,16 @@ class SyncConfiguration:
     """
     All synchronisation configurations.
     """
-    def __init__(self, name: str=None, files: List[FileSyncConfiguration]=None,
-                 subrepos: List[SubrepoSyncConfiguration]=None, templates: List[TemplateSyncConfiguration]=None):
-        self.name = name
+    def __init__(self, files: List[FileSyncConfiguration]=None, subrepos: List[SubrepoSyncConfiguration]=None,
+                 templates: List[TemplateSyncConfiguration]=None):
         self.files = files if files is not None else []
         self.subrepos = subrepos if subrepos is not None else []
         self.templates = templates if templates is not None else []
+
+    def get_number_of_synchronisations(self) -> int:
+        """
+        TODO
+        :return:
+        """
+        return len(self.files) + len(self.subrepos) + len(self.templates)
+

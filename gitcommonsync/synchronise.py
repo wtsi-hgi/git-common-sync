@@ -17,6 +17,7 @@ _logger = logging.getLogger(__name__)
 FileSyncConfigurationType = Type("FileSyncConfigurationType", bound=FileSyncConfiguration)
 
 
+# FIXME: This is ~the same model as `SyncConfiguration`
 class Synchronised:
     """
     Changes that happened during the synchronisation.
@@ -26,28 +27,38 @@ class Synchronised:
         self.subrepo_synchronisations: List[SubrepoSyncConfiguration] = None
         self.template_synchronisations: List[TemplateSyncConfiguration] = None
 
+    def get_number_of_synchronisations(self) -> int:
+        """
+        TODO
+        :return:
+        """
+        return len(self.file_synchronisations) + len(self.subrepo_synchronisations) \
+               + len(self.template_synchronisations)
 
-def synchronise(repository: GitRepository, configuration: SyncConfiguration) -> Synchronised:
+
+# FIXME: Really need to conver this to a class based implementation
+def synchronise(repository: GitRepository, configuration: SyncConfiguration, dry_run: bool=False) -> Synchronised:
     """
     Clones, updates and commits to the given repository, according to the given synchronisation configuration.
     :param repository: the git repository
     :param configuration: the synchronisation configuration
+    :param dry_run: TODO
     :return: TODO
     """
     repository.checkout()
     changed = Synchronised()
     try:
-        changed.subrepo_synchronisations = synchronise_subrepos(repository, configuration.subrepos)
-        changed.file_synchronisations = synchronise_files(repository, configuration.files)
-        changed.template_synchronisations = synchronise_templates(repository, configuration.templates)
+        changed.subrepo_synchronisations = synchronise_subrepos(repository, configuration.subrepos, dry_run=dry_run)
+        changed.file_synchronisations = synchronise_files(repository, configuration.files, dry_run=dry_run)
+        changed.template_synchronisations = synchronise_templates(repository, configuration.templates, dry_run=dry_run)
     finally:
         repository.tear_down()
     return changed
 
 
 # XXX: It would be possible to write an Ansible module for subrepo using this...
-def synchronise_subrepos(repository: GitRepository, configurations: List[SubrepoSyncConfiguration]) \
-        -> List[SubrepoSyncConfiguration]:
+def synchronise_subrepos(repository: GitRepository, configurations: List[SubrepoSyncConfiguration],
+                         dry_run: bool=False) -> List[SubrepoSyncConfiguration]:
     """
     TODO
     :param repository:
@@ -105,12 +116,13 @@ def synchronise_subrepos(repository: GitRepository, configurations: List[Subrepo
             _logger.debug(f"Checked out subrepo: {required_checkout}")
             synchronised.append(configuration)
 
-    repository.push_changes()
+    if not dry_run:
+        repository.push_changes()
 
     return synchronised
 
 
-def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration]) \
+def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration], dry_run: bool=False) \
         -> List[FileSyncConfiguration]:
     """
     Synchronises files in the given repository, according to the given configuration
@@ -124,11 +136,12 @@ def synchronise_files(repository: GitRepository, configurations: List[FileSyncCo
         lambda configuration, target: dict(
             module=ANSIBLE_RSYNC_MODULE_NAME, args=dict(src=configuration.source, dest=target, recursive=True,
                                                         delete=True)
-        )
+        ),
+        dry_run=dry_run
     )
 
 
-def synchronise_templates(repository: GitRepository, configurations: List[TemplateSyncConfiguration]) \
+def synchronise_templates(repository: GitRepository, configurations: List[TemplateSyncConfiguration], dry_run: bool=False) \
         -> List[TemplateSyncConfiguration]:
     """
     TODO
@@ -143,14 +156,16 @@ def synchronise_templates(repository: GitRepository, configurations: List[Templa
         lambda configuration, target: dict(
             module=ANSIBLE_TEMPLATE_MODULE_NAME, args=dict(src=configuration.source, dest=target)
         ),
-        lambda configuration: configuration.variables
+        lambda configuration: configuration.variables,
+        dry_run=dry_run
     )
 
 
 def _synchronise_files(
         repository: GitRepository, configurations: List[FileSyncConfiguration],
         ansible_action_generator: Callable[[FileSyncConfiguration, str], Dict],
-        ansible_variables_generator: Callable[[FileSyncConfiguration, str], Dict[str, str]]=lambda configuration: {}) \
+        ansible_variables_generator: Callable[[FileSyncConfiguration, str], Dict[str, str]]=lambda configuration: {},
+        dry_run: bool=False) \
         -> List[FileSyncConfiguration]:
     """
     TODO.
@@ -194,9 +209,10 @@ def _synchronise_files(
         else:
             _logger.info(f"{configuration.source} == {target}")
 
-    repository.push_changes(
-        f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
-        [os.path.join(repository.checkout_location, file_synchronisation.destination)
-         for file_synchronisation in synchronised])
+    if not dry_run:
+        repository.push_changes(
+            f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
+            [os.path.join(repository.checkout_location, file_synchronisation.destination)
+             for file_synchronisation in synchronised])
 
     return synchronised
