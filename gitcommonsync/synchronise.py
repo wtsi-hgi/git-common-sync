@@ -4,6 +4,7 @@ import shutil
 from typing import List
 
 import gitsubrepo
+from git import Repo
 
 from gitcommonsync._ansible_runner import run_ansible_task
 from gitcommonsync._common import is_subdirectory
@@ -113,26 +114,29 @@ def synchronise_subrepos(repository: GitRepository, configurations: List[Subrepo
         if os.path.exists(destination):
             force_update = False
             url, branch, commit = gitsubrepo.status(destination)
-            if required_checkout.commit is None:
-                commit = None
-            current_checkout = GitCheckout(url, branch, commit, required_checkout.directory)
+            current_checkout = GitCheckout(url, branch, required_checkout.directory, commit=commit)
+            same_url_and_branch = current_checkout.url == required_checkout.url \
+                                  and current_checkout.branch == required_checkout.branch
+
+            if required_checkout.commit is None and same_url_and_branch:
+                subrepo_remote = Repo(configuration.checkout.url)
+                required_checkout.commit = subrepo_remote.heads[configuration.checkout.branch].commit.hexsha[0:7]
 
             if current_checkout == required_checkout:
                 _logger.info(f"Subrepo at {required_checkout.directory} is synchronised")
-
             elif not configuration.overwrite:
                 _logger.info(f"Subrepo at {required_checkout.directory} is not synchronised but not updating as "
                              f"overwrite=False")
-
-            elif current_checkout.url == required_checkout.url and current_checkout.branch == required_checkout.branch:
+            elif same_url_and_branch:
                 _logger.debug(f"Pulling subrepo at {required_checkout.directory} in an attempt to sync")
+                # TODO: We could check whether the remote's head is the commit we want before doing this as it might not
+                # pull to the correct commit.
                 new_commit = gitsubrepo.pull(destination)
-                if new_commit == required_checkout.commit or required_checkout is None:
+                if new_commit == required_checkout.commit:
                     _logger.info(f"Subrepo at {required_checkout.directory}: {commit} => {new_commit}")
                     synchronised.append(configuration)
                 else:
                     force_update = True
-
             else:
                 force_update = True
 

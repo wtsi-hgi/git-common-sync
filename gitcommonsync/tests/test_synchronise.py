@@ -1,21 +1,23 @@
-import hashlib
+import os
 import os
 import shutil
+import stat
 import tarfile
 import unittest
+from pathlib import Path
 from tempfile import mkdtemp, mkstemp
-from time import sleep
 from typing import Tuple
-import stat
 
-from checksumdir import dirhash
+import gitsubrepo
 from git import Repo
+from gitsubrepo.exceptions import NotAGitSubrepoException
 
 from gitcommonsync._repository import GitRepository
 from gitcommonsync.models import FileSyncConfiguration, SubrepoSyncConfiguration, GitCheckout
 from gitcommonsync.synchronise import synchronise_files, synchronise_subrepos
+from gitcommonsync.tests._common import get_md5
 from gitcommonsync.tests._resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
-    BRANCH, DIRECTORY_1, GIT_BRANCH, GIT_COMMIT
+    BRANCH, DIRECTORY_1, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH
 
 NEW_FILE_1 = "new-file.txt"
 NEW_DIRECTORY_1 = "new-directory"
@@ -57,7 +59,7 @@ class _TestWithGitRepository(unittest.TestCase):
 
 class TestSynchroniseFiles(_TestWithGitRepository):
     """
-    TODO
+    Tests for `synchronise_files`.
     """
     def test_sync_non_existent_file(self):
         source = os.path.join(self.temp_directory, "does-not-exist")
@@ -170,34 +172,75 @@ class TestSynchroniseFiles(_TestWithGitRepository):
 
 class TestSynchroniseSubrepos(_TestWithGitRepository):
     """
-    TODO
+    Tests for `synchronise_subrepos`.
     """
     def setUp(self):
         super().setUp()
-        self.git_checkout = GitCheckout(self.external_git_repository_location, GIT_BRANCH, GIT_COMMIT, NEW_DIRECTORY_1)
+        self.git_checkout = GitCheckout(self.external_git_repository_location, GIT_MASTER_BRANCH, NEW_DIRECTORY_1)
         self.git_subrepo_directory = os.path.join(self.git_directory, self.git_checkout.directory)
 
+    def test_sync_onto_existing_non_subrepo_directory(self):
+        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
+        os.makedirs(self.git_subrepo_directory)
+        self.assertRaises(NotAGitSubrepoException, synchronise_subrepos, self.git_repository, configurations)
+
+    def test_sync_to_directory_outside_repository(self):
+        self.git_checkout.directory = self.external_git_repository_location
+        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
+        self.assertRaises(ValueError, synchronise_subrepos, self.git_repository, configurations)
+
     def test_sync_new_subrepo(self):
+        self.git_checkout.commit = GIT_MASTER_HEAD_COMMIT
         configurations = [SubrepoSyncConfiguration(self.git_checkout)]
         synchronised = synchronise_subrepos(self.git_repository, configurations)
         self.assertEqual(configurations, synchronised)
-        print()
-        print()
         self.assertEqual(self.external_git_repository_md5, get_md5(self.git_subrepo_directory))
+        self.assertEqual(self.git_checkout.commit[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
-    # TODO: Relative and absolute path checkout
+    def test_sync_up_to_date_subrepo(self):
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
+        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual([], synchronised)
 
+    def test_sync_out_of_date_subrepo_no_override(self):
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch,
+              commit=GIT_MASTER_OLD_COMMIT)
+        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=False)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual([], synchronised)
+        self.assertEqual(GIT_MASTER_OLD_COMMIT[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
-def get_md5(location: str, ignore_hidden_files: bool=True) -> str:
-    """
-    Gets an MD5 checksum of the file or directory at the given location.
-    :param location: location of file or directory
-    :param ignore_hidden_files: whether hidden files should be ignored when calculating an checksum for a directory
-    :return: the MD5 checksum
-    """
-    if os.path.isfile(location):
-        with open(location, "rb") as file:
-            content = file.read()
-        return hashlib.md5(content).hexdigest()
-    else:
-        return dirhash(location, "md5", ignore_hidden=ignore_hidden_files)
+    def test_sync_out_of_date_subrepo_with_override(self):
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_MASTER_BRANCH)
+        self.git_repository.push_changes()
+
+        updated_repository = GitRepository(self.external_git_repository_location, GIT_MASTER_BRANCH)
+        updated_repository_location = updated_repository.checkout()
+        Path(os.path.join(updated_repository_location, NEW_FILE_1)).touch()
+        updated_repository.push_changes("Updated", [os.path.join(updated_repository_location, NEW_FILE_1)])
+        Repo(self.git_repository.checkout_location).remotes.origin.pull()
+
+        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        self.assertTrue(os.path.exists(os.path.join(self.git_subrepo_directory, NEW_FILE_1)))
+
+    def test_sync_out_of_date_subrepo_to_intermediate_commit(self):
+        self.git_checkout.commit = GIT_MASTER_HEAD_COMMIT
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_MASTER_BRANCH)
+        # Push the clone commit
+        self.git_repository.push_changes()
+        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        self.assertEqual(self.git_checkout.commit[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
+
+    def test_sync_subrepo_to_different_branch(self):
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_DEVELOP_BRANCH)
+        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual(configurations, synchronised)
+        url, branch, commit = gitsubrepo.status(self.git_subrepo_directory)
+        self.assertEqual(GIT_MASTER_HEAD_COMMIT[0:7], commit)
+        self.assertEqual(GIT_MASTER_BRANCH, branch)

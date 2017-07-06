@@ -5,11 +5,11 @@ class GitCheckout:
     """
     Git checkout.
     """
-    def __init__(self, url: str, branch: str, commit: str, directory: str):
+    def __init__(self, url: str, branch: str, directory: str, *, commit: str=None):
         self.url = url
         self.branch = branch
-        self.commit = commit
         self.directory = directory
+        self.commit = commit
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, type(self)) \
