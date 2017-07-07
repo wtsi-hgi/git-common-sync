@@ -43,7 +43,7 @@ class _TestWithGitRepository(unittest.TestCase):
         self.external_git_repository = Repo(self.external_git_repository_location)
 
         self.git_repository = GitRepository(self.external_git_repository_location, BRANCH)
-        self.git_directory = self.git_repository.checkout()
+        self.git_directory = self.git_repository.checkout(parent_directory=self.temp_directory)
         self.external_git_repository_md5 = get_md5(self.git_directory)
 
     def tearDown(self):
@@ -222,7 +222,7 @@ class TestSynchroniseSubrepos(_TestWithGitRepository):
         self.git_repository.push_changes()
 
         updated_repository = GitRepository(self.external_git_repository_location, GIT_MASTER_BRANCH)
-        updated_repository_location = updated_repository.checkout()
+        updated_repository_location = updated_repository.checkout(parent_directory=self.create_test_directory()[0])
         Path(os.path.join(updated_repository_location, NEW_FILE_1)).touch()
         updated_repository.push_changes("Updated", [os.path.join(updated_repository_location, NEW_FILE_1)])
         Repo(self.git_repository.checkout_location).remotes.origin.pull()

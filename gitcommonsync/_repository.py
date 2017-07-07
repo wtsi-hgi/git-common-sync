@@ -34,15 +34,16 @@ class GitRepository:
         if self.checkout_location:
             shutil.rmtree(self.checkout_location)
 
-    def checkout(self) -> str:
+    def checkout(self, parent_directory: str=None) -> str:
         """
         TODO
+        :param parent_directory: TODO
         :return:
         """
         if self.checkout_location is not None:
             raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
 
-        self.checkout_location = mkdtemp()
+        self.checkout_location = mkdtemp(dir=parent_directory)
         repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location)
 
         if self.branch not in repository.heads:
