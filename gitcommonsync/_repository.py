@@ -3,7 +3,7 @@ import shutil
 from tempfile import mkdtemp
 from typing import List, Callable
 
-from git import Repo
+from git import Repo, GitCommandError
 
 DEFAULT_BRANCH = "master"
 
@@ -82,10 +82,17 @@ class GitRepository:
         :return:
         """
         if len(changed_files) > 0:
+            repository = Repo(self.checkout_location)
+            try:
+                repository.git.config("user.name")
+                repository.git.config("user.email")
+            except GitCommandError as e:
+                raise RuntimeError(
+                    "`git config --global user.name` and `git config --global user.email` must be set") from e
+
             added = {changed_file for changed_file in changed_files if os.path.exists(changed_file)}
             removed = set(changed_files) - added
 
-            repository = Repo(self.checkout_location)
             index = repository.index
             if len(added) > 0:
                 index.add(added)
