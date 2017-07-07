@@ -28,6 +28,7 @@ TEMPLATE_VARIABLES = {
     "bar": "abc"
 }
 TEMPLATE = {parameter: "{{ %s }}" % parameter for parameter in TEMPLATE_VARIABLES.keys()}
+GITHUB_TEST_REPOSITORY = "https://github.com/colin-nolan/test-repository.git"
 
 
 class _TestWithGitRepository(unittest.TestCase):
@@ -206,6 +207,13 @@ class TestSynchroniseSubrepos(_TestWithGitRepository):
     def test_sync_up_to_date_subrepo(self):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
         configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
+        synchronised = synchronise_subrepos(self.git_repository, configurations)
+        self.assertEqual([], synchronised)
+
+    def test_sync_new_subrepo_from_github(self):
+        self.git_checkout.url = GITHUB_TEST_REPOSITORY
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
+        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
         synchronised = synchronise_subrepos(self.git_repository, configurations)
         self.assertEqual([], synchronised)
 
