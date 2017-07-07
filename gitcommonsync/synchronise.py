@@ -134,8 +134,9 @@ def synchronise_files(repository: GitRepository, configurations: List[FileSyncCo
         repository,
         configurations,
         lambda configuration, target: dict(
-            module=ANSIBLE_RSYNC_MODULE_NAME, args=dict(src=configuration.source, dest=target, recursive=True,
-                                                        delete=True)
+            module=ANSIBLE_RSYNC_MODULE_NAME,
+            args=dict(src=configuration.source, dest=target, recursive=True, delete=True, archive=False, perms=True,
+                      links=True, checksum=True)
         ),
         dry_run=dry_run
     )
