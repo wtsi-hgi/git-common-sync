@@ -9,18 +9,17 @@ from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguratio
 EXAMPLES = """
 - gitcommonsync:
     repository: http://www.example.com/repository.git
-    ssh_private_key: "{{ my_ssh_private_key }}"
     files:
-      - src: example/README.md
+      - src: /example/README.md
         dest: README.md
         overwrite: false
-      - src: example/directory/
+      - src: /example/directory/
         dest: config
     templates:
-      - src: example/templates/ansible-groups.sh.j2
-        dest: ci/before_scripts.d
+      - src: /example/ansible-groups.sh.j2
+        dest: ci/before_scripts.d/start.sh
         variables:
-          groups: "common,docker"
+          message: "Hello world"
         overwrite: true
     subrepos:
       - src: http://www.example.com/other-repository.git
@@ -137,7 +136,7 @@ def generate_output_information(synchronised: Synchronised) -> Dict[str, Any]:
     return {
         "files": [synchronisation.destination for synchronisation in synchronised.file_synchronisations],
         "templates": [synchronisation.destination for synchronisation in synchronised.template_synchronisations],
-        "subrepos": [synchronisation.destination for synchronisation in synchronised.subrepo_synchronisations]
+        "subrepos": [synchronisation.checkout.directory for synchronisation in synchronised.subrepo_synchronisations]
     }
 
 
