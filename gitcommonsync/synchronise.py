@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from tempfile import TemporaryDirectory
 from typing import List, Dict, Callable, Type
 
 import gitsubrepo
@@ -82,8 +83,13 @@ def synchronise_subrepos(repository: GitRepository, configurations: List[Subrepo
                                   and current_checkout.branch == required_checkout.branch
 
             if required_checkout.commit is None and same_url_and_branch:
-                subrepo_remote = Repo(configuration.checkout.url)
-                required_checkout.commit = subrepo_remote.heads[configuration.checkout.branch].commit.hexsha[0:7]
+                with TemporaryDirectory() as temp_directory:
+                    subrepo_remote = Repo.init(temp_directory)
+                    origin = subrepo_remote.create_remote("origin", url)
+                    fetch_infos = origin.fetch()
+                    for fetch_info in fetch_infos:
+                        if fetch_info.name == f"origin/{branch}":
+                            required_checkout.commit = fetch_info.commit.hexsha[0:7]
 
             if current_checkout == required_checkout:
                 _logger.info(f"Subrepo at {required_checkout.directory} is synchronised")
