@@ -217,9 +217,7 @@ def _synchronise_files(
             _logger.info(f"{configuration.source} == {target}")
 
     if not dry_run:
-        repository.push_changes(
-            f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'}.",
-            [os.path.join(repository.checkout_location, file_synchronisation.destination)
-             for file_synchronisation in synchronised])
+        repository.push_changes(f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'}.")
+    # TODO: Commit but not push if dry run
 
     return synchronised
