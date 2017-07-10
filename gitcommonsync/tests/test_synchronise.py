@@ -17,7 +17,7 @@ from gitcommonsync._repository import GitRepository
 from gitcommonsync.models import FileSyncConfiguration, SubrepoSyncConfiguration, GitCheckout, TemplateSyncConfiguration
 from gitcommonsync.synchronise import synchronise_files, synchronise_subrepos, synchronise_templates
 from gitcommonsync.tests._common import get_md5
-from gitcommonsync.tests._resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
+from gitcommonsync.tests.resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
     BRANCH, DIRECTORY_1, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH
 
 NEW_FILE_1 = "new-file.txt"
