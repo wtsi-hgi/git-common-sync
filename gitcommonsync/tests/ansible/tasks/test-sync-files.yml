@@ -1,0 +1,28 @@
+---
+
+- block:
+  - include: setup.yml
+
+  - name: test file and directory synchronisation
+    gitcommonsync:
+      repository: "{{ remote_directory }}"
+      files:
+        - src: /example/README.md
+          dest: README.md
+          overwrite: true
+
+        - src: /example/README.md
+          dest: README.md
+          overwrite: false
+
+        - src: /example/directory/
+          dest: config
+          overwrite: true
+
+        - src: /example/directory/
+          dest: config
+          overwrite: false
+
+  always:
+    - include: tear-down.yml
+

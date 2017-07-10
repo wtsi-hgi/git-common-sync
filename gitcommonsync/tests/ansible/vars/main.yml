@@ -1,0 +1,4 @@
+---
+
+gitcommonsync_test_remote_git_repository: "test-repository.git"
+gitcommonsync_test_git_checkout: "checkout"

@@ -1,0 +1,23 @@
+---
+
+- name: create temp directory for test case
+  tempfile:
+    state: directory
+  register: temp_directory
+
+- set_fact:
+    temp_directory: "{{ temp_directory.path }}"
+
+- name: extract remote Git repository for testing
+  unarchive:
+    src: test-repository.zip
+    dest: "{{ temp_directory }}"
+
+- set_fact:
+    remote_directory: "{{ temp_directory }}/{{ gitcommonsync_test_remote_git_repository }}"
+    checkout_directory: "{{ temp_directory }}/{{ gitcommonsync_test_git_checkout }}"
+
+- name: checkout copy of the test repository
+  git:
+    repo: "{{ remote_directory }}"
+    dest: "{{ checkout_directory }}"
