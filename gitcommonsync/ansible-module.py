@@ -1,3 +1,4 @@
+import traceback
 from typing import Any, Dict, Tuple
 
 from ansible.module_utils.basic import AnsibleModule
@@ -74,10 +75,11 @@ def fail_if_missing_dependencies(module: AnsibleModule):
     :return:
     """
     if not _HAS_DEPENDENCIES:
-        module.fail_json(msg="A required Python module is not installed: %s" % _IMPORT_ERROR)
+        module.fail_json(msg="A required Python module is not installed: %s" % traceback.format_exception(
+            type(_IMPORT_ERROR), _IMPORT_ERROR, _IMPORT_ERROR.__traceback__))
 
 
-def parse_configuration(parameters: Dict[str, Any]) -> Tuple[GitRepository, SyncConfiguration]:
+def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "SyncConfiguration"]:
     """
     TODO
     :param parameters:
@@ -127,7 +129,7 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple[GitRepository, Sync
     return repository, sync_configuration
 
 
-def generate_output_information(synchronised: Synchronised) -> Dict[str, Any]:
+def generate_output_information(synchronised: "Synchronised") -> Dict[str, Any]:
     """
     TODO
     :param synchronised:
