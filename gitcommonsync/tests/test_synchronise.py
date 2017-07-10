@@ -87,6 +87,7 @@ class TestSynchroniseFiles(_TestWithGitRepository):
             self.assertEqual(0, len(synchronised))
             self.assertEqual(destination_original_md5, get_md5(configuration.destination))
         self.assertEqual(source_md5, get_md5(configuration.source))
+        self.assertFalse(Repo(self.git_directory).is_dirty())
 
     def test_sync_non_existent_file(self):
         source = os.path.join(self.temp_directory, "does-not-exist")
