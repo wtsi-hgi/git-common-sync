@@ -7,6 +7,7 @@ EXTERNAL_REPOSITORY_NAME = "test-repository.git"
 BRANCH = "master"
 FILE_1 = "update.txt"
 DIRECTORY_1 = "a"
+DIRECTORY_1_FILE_1 = "d.txt"
 
 
 GIT_MASTER_BRANCH = "master"
