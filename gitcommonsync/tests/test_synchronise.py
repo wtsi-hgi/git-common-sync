@@ -20,6 +20,8 @@ from gitcommonsync.tests._common import get_md5
 from gitcommonsync.tests.resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
     BRANCH, DIRECTORY_1, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH
 
+from zipfile import ZipFile
+
 NEW_FILE_1 = "new-file.txt"
 NEW_DIRECTORY_1 = "new-directory"
 CONTENTS = "test contents"
@@ -38,7 +40,7 @@ class _TestWithGitRepository(unittest.TestCase):
     def setUp(self):
         self.temp_directory = mkdtemp()
 
-        with tarfile.open(EXTERNAL_REPOSITORY_ARCHIVE) as archive:
+        with ZipFile(EXTERNAL_REPOSITORY_ARCHIVE) as archive:
             archive.extractall(path=self.temp_directory)
         self.external_git_repository_location = os.path.join(self.temp_directory, EXTERNAL_REPOSITORY_NAME)
         self.external_git_repository = Repo(self.external_git_repository_location)

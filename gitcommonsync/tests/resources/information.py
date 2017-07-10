@@ -1,7 +1,7 @@
 import os
 
 
-EXTERNAL_REPOSITORY_ARCHIVE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test-repository.tar.gz")
+EXTERNAL_REPOSITORY_ARCHIVE = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test-repository.zip")
 EXTERNAL_REPOSITORY_NAME = "test-repository.git"
 
 BRANCH = "master"
