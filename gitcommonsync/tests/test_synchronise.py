@@ -68,26 +68,6 @@ class TestSynchroniseFiles(_TestWithGitRepository):
     """
     Tests for `synchronise_files`.
     """
-    def _synchronise_and_assert(self, configuration: FileSyncConfiguration, expect_sync: bool=True):
-        """
-        TODO
-        :param configuration:
-        :param expect_sync:
-        :return:
-        """
-        source_md5 = get_md5(configuration.source)
-        destination_original_md5 = get_md5(configuration.destination)
-        synchronised = synchronise_files(self.git_repository, [configuration])
-
-        if expect_sync:
-            self.assertEqual([configuration], synchronised)
-            self.assertEqual(get_md5(configuration.source), get_md5(configuration.destination))
-        else:
-            self.assertEqual(0, len(synchronised))
-            self.assertEqual(destination_original_md5, get_md5(configuration.destination))
-        self.assertEqual(source_md5, get_md5(configuration.source))
-        self.assertFalse(Repo(self.git_directory).is_dirty())
-
     def test_sync_non_existent_file(self):
         source = os.path.join(self.temp_directory, "does-not-exist")
         destination = os.path.join(self.git_directory, FILE_1)
@@ -170,6 +150,28 @@ class TestSynchroniseFiles(_TestWithGitRepository):
         assert stat.S_IMODE(os.lstat(source).st_mode) == 770
         self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=True))
         self.assertEqual(770, stat.S_IMODE(os.lstat(destination).st_mode))
+
+    def _synchronise_and_assert(self, configuration: FileSyncConfiguration, expect_sync: bool=True):
+        """
+        TODO
+        :param configuration:
+        :param expect_sync:
+        :return:
+        """
+        source_md5 = get_md5(configuration.source)
+        destination_original_md5 = get_md5(configuration.destination)
+        synchronised = synchronise_files(self.git_repository, [configuration])
+
+        if expect_sync:
+            self.assertEqual([configuration], synchronised)
+            self.assertEqual(get_md5(configuration.source), get_md5(configuration.destination))
+        else:
+            self.assertEqual(0, len(synchronised))
+            self.assertEqual(destination_original_md5, get_md5(configuration.destination))
+        self.assertEqual(source_md5, get_md5(configuration.source))
+
+        repository = Repo(self.git_directory)
+        self.assertFalse(Repo(self.git_directory).is_dirty(), msg=repository.git.diff())
 
 
 class TestSynchroniseSubrepos(_TestWithGitRepository):
