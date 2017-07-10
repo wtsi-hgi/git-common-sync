@@ -218,7 +218,7 @@ def _synchronise_files(
 
     if not dry_run:
         repository.push_changes(
-            f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else ''}",
+            f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'}.",
             [os.path.join(repository.checkout_location, file_synchronisation.destination)
              for file_synchronisation in synchronised])
 
