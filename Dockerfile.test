@@ -8,6 +8,7 @@ RUN git config --global user.email "example@example.com" \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         rsync \
+        unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ADD test_requirements.txt ${INSTALL_DIRECTORY}

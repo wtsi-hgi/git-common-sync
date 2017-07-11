@@ -18,7 +18,7 @@ class AnsibleRuntimeException(RuntimeError):
     """
 
 
-class _ResultCallback(CallbackBase):
+class ResultCallbackHandler(CallbackBase):
     """
     Ansible playbook callback handler.
     """
@@ -49,7 +49,8 @@ class PlaybookOptions:
 
 
 def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[str, str]=None,
-                 playbook_options: PlaybookOptions=None) -> List[TaskResult]:
+                playbook_options: PlaybookOptions=None, results_callback_handler: ResultCallbackHandler=None) \
+        -> List[TaskResult]:
     """
     Run the given Ansible tasks or roles with the given options.
     :param tasks: the tasks to run, represented in a list, containing dictionaries. e.g.
@@ -59,6 +60,7 @@ def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[s
     :param roles: the names of the roles to run
     :param variables: Ansible variables (key-value pairs)
     :param playbook_options: options to use when running Ansible playbook
+    :param results_callback_handler: handler for callbacks
     :return: the results of running Ansible
     """
     if variables is None:
@@ -69,7 +71,8 @@ def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[s
     variable_manager = VariableManager()
     variable_manager.extra_vars = variables
     loader = DataLoader()
-    results_callback = _ResultCallback()
+    if results_callback_handler is None:
+        results_callback_handler = ResultCallbackHandler()
 
     inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=None)
     variable_manager.set_inventory(inventory)
@@ -93,11 +96,11 @@ def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[s
             loader=loader,
             options=playbook_options,
             passwords=dict(),
-            stdout_callback=results_callback
+            stdout_callback=results_callback_handler
         )
         task_queue_manager.run(play)
     finally:
         if task_queue_manager is not None:
             task_queue_manager.cleanup()
 
-    return results_callback.results
+    return results_callback_handler.results
