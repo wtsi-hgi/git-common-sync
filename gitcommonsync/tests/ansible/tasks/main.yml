@@ -1,3 +1,5 @@
 ---
 
 - include: test-sync-files.yml
+
+- include: test-sync-subrepos.yml
