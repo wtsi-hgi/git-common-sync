@@ -1,1 +1,1 @@
-../../../ansible-module.py
+../../../ansible_module.py
