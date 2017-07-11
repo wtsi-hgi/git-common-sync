@@ -97,7 +97,8 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "S
         TemplateSyncConfiguration(
             source=configuration[_TEMPLATE_SOURCE_PROPERTY],
             destination=configuration[_TEMPLATE_DESTINATION_PROPERTY],
-            overwrite=configuration[_TEMPLATE_OVERWRITE_PROPERTY],
+            overwrite=configuration[_TEMPLATE_OVERWRITE_PROPERTY]
+            if _TEMPLATE_OVERWRITE_PROPERTY in configuration else False,
             variables=configuration[_TEMPLATE_VARIABLES_PROPERTY]
         )
         for configuration in parameters[_TEMPLATES_PROPERTY]
