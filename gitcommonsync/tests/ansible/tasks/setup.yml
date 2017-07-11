@@ -1,6 +1,6 @@
 ---
 
-- name: create temp directory for test case
+- name: create temp directory for tests
   tempfile:
     state: directory
   register: temp_directory
@@ -15,9 +15,11 @@
 
 - set_fact:
     remote_directory: "{{ temp_directory }}/{{ gitcommonsync_test_remote_git_repository }}"
-    checkout_directory: "{{ temp_directory }}/{{ gitcommonsync_test_git_checkout }}"
 
-- name: checkout copy of the test repository
-  git:
-    repo: "{{ remote_directory }}"
-    dest: "{{ checkout_directory }}"
+- name: prepare test files
+  copy:
+    src: example-files
+    dest: "{{ temp_directory }}"
+
+- set_fact:
+    example_files: "{{ temp_directory }}/example-files"

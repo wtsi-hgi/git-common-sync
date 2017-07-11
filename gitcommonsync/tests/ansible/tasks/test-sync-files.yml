@@ -3,14 +3,6 @@
 - block:
   - include: setup.yml
 
-  - set_fact:
-      example_files: "{{ temp_directory }}/example-files"
-
-  - name: prepare test files
-    copy:
-      src: example-files
-      dest: "{{ temp_directory }}"
-
   - name: test synchronise new file
     gitcommonsync:
       repository: "{{ remote_directory }}"
