@@ -1,4 +1,4 @@
-from typing import  Dict
+from typing import Dict, List
 
 from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible.executor.task_result import TaskResult
@@ -24,13 +24,13 @@ class _ResultCallback(CallbackBase):
     """
     def __init__(self):
         super().__init__()
-        self.result = None
+        self.results = []
 
     def v2_runner_on_ok(self, result, **kwargs):
-        self.result = result
+        self.results.append(result)
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
-        self.result = result
+        self.results.append(result)
 
 
 class PlaybookOptions:
@@ -48,16 +48,18 @@ class PlaybookOptions:
         self.check = check
 
 
-def run_ansible_task(task: Dict, variables: Dict[str, str]=None, playbook_options: PlaybookOptions=None) -> TaskResult:
+def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[str, str]=None,
+                 playbook_options: PlaybookOptions=None) -> List[TaskResult]:
     """
-    Run the given description of an Ansible task with the given options.
-    :param task: the task to run, represented in a JSON dictionary. e.g.
+    Run the given Ansible tasks or roles with the given options.
+    :param tasks: the tasks to run, represented in a list, containing dictionaries. e.g.
     ```
     dict(action=dict(module="file", args=dict(path="/testing", state="directory"), register="testing_created")
     ```
+    :param roles: the names of the roles to run
     :param variables: Ansible variables (key-value pairs)
     :param playbook_options: options to use when running Ansible playbook
-    :return: the results of running the task
+    :return: the results of running Ansible
     """
     if variables is None:
         variables = {}
@@ -75,8 +77,12 @@ def run_ansible_task(task: Dict, variables: Dict[str, str]=None, playbook_option
     play_source = dict(
         hosts="localhost",
         gather_facts="no",
-        tasks=[task]
     )
+    if tasks is not None:
+        play_source["tasks"] = tasks
+    if roles is not None:
+        play_source["roles"] = roles
+
     play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
 
     task_queue_manager = None
@@ -94,4 +100,4 @@ def run_ansible_task(task: Dict, variables: Dict[str, str]=None, playbook_option
         if task_queue_manager is not None:
             task_queue_manager.cleanup()
 
-    return results_callback.result
+    return results_callback.results

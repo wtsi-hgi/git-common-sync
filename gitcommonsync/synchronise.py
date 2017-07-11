@@ -7,11 +7,12 @@ from typing import List, Dict, Callable, Type
 import gitsubrepo
 from git import Repo
 
-from gitcommonsync._ansible_runner import run_ansible_task, ANSIBLE_RSYNC_MODULE_NAME, ANSIBLE_TEMPLATE_MODULE_NAME
+from gitcommonsync._ansible_runner import ANSIBLE_RSYNC_MODULE_NAME, ANSIBLE_TEMPLATE_MODULE_NAME, \
+    run_ansible
 from gitcommonsync._common import is_subdirectory
+from gitcommonsync._repository import GitRepository
 from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout, \
     TemplateSyncConfiguration
-from gitcommonsync._repository import GitRepository
 
 _logger = logging.getLogger(__name__)
 
@@ -206,11 +207,12 @@ def _synchronise_files(
             _logger.info(f"Creating intermediate directories: {intermediate_directories}")
             os.makedirs(intermediate_directories)
 
-        result = run_ansible_task(dict(action=ansible_action_generator(configuration, target)),
-                                  ansible_variables_generator(configuration))
-        if result.is_failed():
-            raise RuntimeError(result._result)
-        if result.is_changed():
+        results = run_ansible(tasks=[dict(action=ansible_action_generator(configuration, target))],
+                             variables=ansible_variables_generator(configuration))
+        assert len(results) <= 1
+        if results[0].is_failed():
+            raise RuntimeError(results[0]._result)
+        if results[0].is_changed():
             synchronised.append(configuration)
             _logger.info(f"{configuration.source} => {target} (overwrite={configuration.overwrite})")
         else:
