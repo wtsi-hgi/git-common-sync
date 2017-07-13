@@ -207,6 +207,7 @@ class TestSynchroniseSubrepos(_TestWithGitRepository):
         synchronised = synchronise_subrepos(self.git_repository, configurations)
         self.assertEqual([], synchronised)
 
+    # TODO: Skip if no (good) Internet connection (e.g. on a bus...)
     def test_sync_new_subrepo_from_github(self):
         self.git_checkout.url = GITHUB_TEST_REPOSITORY
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
