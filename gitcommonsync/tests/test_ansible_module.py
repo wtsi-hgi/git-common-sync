@@ -1,5 +1,6 @@
 import os
 import unittest
+import warnings
 
 from gitcommonsync._ansible_runner import run_ansible, ResultCallbackHandler
 
@@ -32,6 +33,10 @@ class TestAnsibleModule(unittest.TestCase):
     """
     Tests runner of the Ansible tests.
     """
+    def setUp(self):
+        warnings.simplefilter("ignore", ResourceWarning)
+        warnings.simplefilter("ignore", DeprecationWarning)
+
     def test_ansible_execution(self):
         run_ansible(roles=[os.path.join(_SCRIPT_LOCATION, _ANSIBLE_TEST_ROLE_NAME)],
                     results_callback_handler=CustomResultCallbackHandler(self))
