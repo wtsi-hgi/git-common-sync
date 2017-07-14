@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 from checksumdir import dirhash
+from pip._vendor import requests
 
 
 def get_md5(location: str, ignore_hidden_files: bool=True) -> Optional[str]:
@@ -20,3 +21,17 @@ def get_md5(location: str, ignore_hidden_files: bool=True) -> Optional[str]:
         return hashlib.md5(content).hexdigest()
     else:
         return dirhash(location, "md5", ignore_hidden=ignore_hidden_files)
+
+
+def is_accessible(url: str) -> bool:
+    """
+    Checks if the given URL is accessible.
+
+    This function attempts to get the content at the location - avoid pointing to the location of a huge file!
+    :param url: the URL to check
+    :return: whether the given URL is accessible
+    """
+    try:
+        return requests.get(url).status_code == requests.codes.ok
+    except Exception:
+        return False
