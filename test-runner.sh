@@ -2,7 +2,6 @@
 set -eu -o pipefail
 
 export PROJECT_ROOT=/data
-
 PYTHONPATH=. coverage run -m unittest discover -v -s gitcommonsync/tests
 
 coverage run setup.py install
