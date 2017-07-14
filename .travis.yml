@@ -13,7 +13,7 @@ before_install:
   - pip install codecov
 
 script:
-  - docker run -v $PWD:/data -w /data testing-image ./test-runner.sh
+  - docker run -v $PWD:$PWD -w $PWD testing-image ./test-runner.sh
 
 after_success:
   - codecov
