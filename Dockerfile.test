@@ -14,6 +14,6 @@ RUN apt-get update \
 ADD test_requirements.txt ${INSTALL_DIRECTORY}
 ADD requirements.txt ${INSTALL_DIRECTORY}
 RUN pip install coverage \
-    && pip install -r ${INSTALL_DIRECTORY}/test_requirements.txt \
-    && pip install -r ${INSTALL_DIRECTORY}/requirements.txt
+    && pip install -U -r ${INSTALL_DIRECTORY}/test_requirements.txt \
+    && pip install -U -r ${INSTALL_DIRECTORY}/requirements.txt
 RUN rm ${INSTALL_DIRECTORY}/*requirements.txt
