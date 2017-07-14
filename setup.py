@@ -15,6 +15,6 @@ setup(
     install_requires=open("requirements.txt", "r").readlines(),
     url="https://github.com/wtsi-hgi/git-common-sync",
     license="MIT",
-    description="",     # TODO
+    description="A tool to synchronise common files between Git repositories",
     long_description=read_markdown("README.md")
 )
