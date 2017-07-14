@@ -12,6 +12,8 @@ before_install:
   - docker build -t testing-image -f Dockerfile.test .
   - pip install codecov
 
+install:
+
 script:
   - docker run -v $PWD:/data -w /data testing-image ./test-runner.sh
 
