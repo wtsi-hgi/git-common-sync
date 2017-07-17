@@ -27,15 +27,16 @@ class GitRepository:
     """
     _REQUIRED_CONFIGS = ["user.name", "user.email"]
 
-    def __init__(self, remote: str, branch: str):
+    def __init__(self, remote: str, branch: str, checkout_location: str=None):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
         :param branch: the branch on the remote that is to be checked out
+        :param checkout_location: optional location in which the repository has already being checked out
         """
         self.remote = remote
         self.branch = branch
-        self.checkout_location = None
+        self.checkout_location = checkout_location
 
     def tear_down(self):
         """
@@ -57,17 +58,6 @@ class GitRepository:
         self.checkout_location = mkdtemp(dir=parent_directory)
         repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location)
 
-        if self.branch not in repository.heads:
-            branch_reference = None
-            for reference in repository.refs:
-                if reference.name == f"origin/{self.branch}":
-                    branch_reference = reference
-                    break
-            if branch_reference is not None:
-                raise ValueError(f"Branch {self.branch} not found in remote repository at "
-                                 f"{self.remote}")
-            commit = repository.commit(self.branch)
-            repository.create_head(path=self.branch, commit=commit)
         repository.heads[self.branch].checkout()
         return self.checkout_location
 
