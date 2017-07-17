@@ -1,6 +1,8 @@
 EXAMPLES = """
 - gitcommonsync:
     repository: http://www.example.com/repository.git
+    committer_name: Ansible Synchroniser
+    committer_email: team@example.com
     files:
       - src: /example/README.md
         dest: README.md
@@ -39,6 +41,9 @@ from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguratio
 
 _REPOSITORY_URL_PROPERTY = "repository"
 _REPOSITORY_BRANCH_PROPERTY = "branch"
+_REPOSITORY_COMMITTER_NAME_PROPERTY = "committer_name"
+_REPOSITORY_COMMITTER_EMAIL_PROPERTY = "committer_email"
+
 _TEMPLATES_PROPERTY = "templates"
 _FILES_PROPERTY = "files"
 _SUBREPOS_PROPERTY = "subrepos"
@@ -61,6 +66,8 @@ _SUBREPO_OVERWRITE_PROPERTY = "overwrite"
 _ARGUMENT_SPEC = {
     _REPOSITORY_URL_PROPERTY: dict(required=True, type="str"),
     _REPOSITORY_BRANCH_PROPERTY: dict(required=False, default="master", type="str"),
+    _REPOSITORY_COMMITTER_NAME_PROPERTY: dict(required=False, type="str"),
+    _REPOSITORY_COMMITTER_EMAIL_PROPERTY: dict(required=False, type="str"),
     _TEMPLATES_PROPERTY: dict(required=False, default=[], type="list"),
     _FILES_PROPERTY: dict(required=False, default=[], type="list"),
     _SUBREPOS_PROPERTY: dict(required=False, default=[], type="list")
@@ -87,9 +94,11 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Sy
     """
     repository_location = arguments[_REPOSITORY_URL_PROPERTY]
     branch = arguments[_REPOSITORY_BRANCH_PROPERTY]
+    comitter_name = arguments[_REPOSITORY_COMMITTER_NAME_PROPERTY]
+    comitter_email = arguments[_REPOSITORY_COMMITTER_EMAIL_PROPERTY]
 
-    # TODO: Manage key based authentication
-    repository = GitRepository(remote=repository_location, branch=branch)
+    repository = GitRepository(
+        remote=repository_location, branch=branch, committer_name_and_email=(comitter_name, comitter_email))
 
     sync_configuration = SyncConfiguration()
 

@@ -1,9 +1,9 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable
+from typing import List, Callable, Tuple
 
-from git import Repo, GitCommandError
+from git import Repo, GitCommandError, IndexFile, Actor
 
 DEFAULT_BRANCH = "master"
 
@@ -27,16 +27,22 @@ class GitRepository:
     """
     _REQUIRED_CONFIGS = ["user.name", "user.email"]
 
-    def __init__(self, remote: str, branch: str, checkout_location: str=None):
+    def __init__(self, remote: str, branch: str, *, checkout_location: str=None,
+                 committer_name_and_email: Tuple[str, str]=None):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
         :param branch: the branch on the remote that is to be checked out
         :param checkout_location: optional location in which the repository has already being checked out
+        :param committer_name_and_email: the commit author to use, where the first element is the author's name and the
+        second is the author's email address. If not defined, it will be attempted to get the author from the global
+        configuration
         """
         self.remote = remote
         self.branch = branch
         self.checkout_location = checkout_location
+        self.committer_name = committer_name_and_email[0] if committer_name_and_email is not None else None
+        self.committer_email = committer_name_and_email[1] if committer_name_and_email is not None else None
 
     def tear_down(self):
         """
@@ -81,11 +87,6 @@ class GitRepository:
         """
         if changed_files is None or len(changed_files) > 0:
             repository = Repo(self.checkout_location)
-            for config in GitRepository._REQUIRED_CONFIGS:
-                try:
-                    repository.git.config(config)
-                except GitCommandError as e:
-                    raise RuntimeError(f"`git config --global {config}` must be set") from e
 
             index = repository.index
             if changed_files is not None:
@@ -99,4 +100,21 @@ class GitRepository:
                 repository.git.add(A=True)
 
             if len(repository.index.diff(repository.head.commit)) > 0:
-                index.commit(commit_message)
+                self._commit(index, commit_message)
+
+    def _commit(self, index: IndexFile, commit_message: str):
+        """
+        Commits the changes to the given index with the given commit message.
+        :param index: the repository index with changes to commit
+        :param commit_message: the message to associate with the commit
+        """
+        if self.committer_name is not None and self.committer_email is not None:
+            author = Actor(self.committer_name, self.committer_email)
+        else:
+            for config in GitRepository._REQUIRED_CONFIGS:
+                try:
+                    index.repo.git.config(config)
+                except GitCommandError as e:
+                    raise RuntimeError(f"`git config --global {config}` must be set") from e
+            author = None
+        index.commit(commit_message, author=author)

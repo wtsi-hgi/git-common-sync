@@ -5,3 +5,5 @@
 - include: test-sync-templates.yml
 
 - include: test-sync-subrepos.yml
+
+- include: test-setting-committer.yml
