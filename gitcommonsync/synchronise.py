@@ -38,14 +38,13 @@ class Synchronised:
                + len(self.template_synchronisations)
 
 
-# FIXME: Really need to conver this to a class based implementation
 def synchronise(repository: GitRepository, configuration: SyncConfiguration, dry_run: bool=False) -> Synchronised:
     """
     Clones, updates and commits to the given repository, according to the given synchronisation configuration.
     :param repository: the git repository
     :param configuration: the synchronisation configuration
-    :param dry_run: TODO
-    :return: TODO
+    :param dry_run: does not push changes back if set to True
+    :return: the synchronisations applied
     """
     repository.checkout()
     changed = Synchronised()
@@ -58,14 +57,14 @@ def synchronise(repository: GitRepository, configuration: SyncConfiguration, dry
     return changed
 
 
-# XXX: It would be possible to write an Ansible module for subrepo using this...
+# Note: It would be possible to write an Ansible module for subrepo using this...
 def synchronise_subrepos(repository: GitRepository, configurations: List[SubrepoSyncConfiguration],
                          dry_run: bool=False) -> List[SubrepoSyncConfiguration]:
     """
-    TODO
-    :param repository:
-    :param configurations:
-    :return:
+    Synchronises subrepos in the given repository, according to the given configuration.
+    :param repository: the location of the checked out repository
+    :param configurations: the subrepo synchronisation configurations
+    :return: the synchronisations applied
     """
     synchronised: List[SubrepoSyncConfiguration] = []
 
@@ -132,12 +131,12 @@ def synchronise_subrepos(repository: GitRepository, configurations: List[Subrepo
 def synchronise_files(repository: GitRepository, configurations: List[FileSyncConfiguration], dry_run: bool=False) \
         -> List[FileSyncConfiguration]:
     """
-    Synchronises files in the given repository, according to the given configuration
+    Synchronises files in the given repository, according to the given configuration.
     :param repository: the location of the checked out repository
     :param configurations: the file synchronisation configurations
     :return: the synchronisations applied
     """
-    return _synchronise_files(
+    return _synchronise_files_with_ansible(
         repository,
         configurations,
         lambda configuration, target: dict(
@@ -152,13 +151,13 @@ def synchronise_files(repository: GitRepository, configurations: List[FileSyncCo
 def synchronise_templates(repository: GitRepository, configurations: List[TemplateSyncConfiguration], dry_run: bool=False) \
         -> List[TemplateSyncConfiguration]:
     """
-    TODO
+    Synchronises templates in the given repository, according to the given configuration.
     :param repository: the location of the checked out repository
     :param configurations: the file template synchronisation configurations
     :return: the synchronisations applied
     """
     # FIXME: The loss of type here indicates this should be refactored into a generic class based form
-    return _synchronise_files(
+    return _synchronise_files_with_ansible(
         repository,
         configurations,
         lambda configuration, target: dict(
@@ -169,18 +168,22 @@ def synchronise_templates(repository: GitRepository, configurations: List[Templa
     )
 
 
-def _synchronise_files(
+def _synchronise_files_with_ansible(
         repository: GitRepository, configurations: List[FileSyncConfiguration],
         ansible_action_generator: Callable[[FileSyncConfiguration, str], Dict],
-        ansible_variables_generator: Callable[[FileSyncConfiguration, str], Dict[str, str]]=lambda configuration: {},
+        ansible_variables_generator: Callable[[FileSyncConfiguration], Dict[str, str]]=lambda configuration: {},
         dry_run: bool=False) \
         -> List[FileSyncConfiguration]:
     """
-    TODO.
+    Synchronises files using Ansible.
     :param repository: the location of the checked out repository
-    :param configurations: TODO
-    :param ansible_action_generator: TODO
-    :param ansible_variables_generator: TODO
+    :param configurations: the configuration for file synchronisation
+    :param ansible_action_generator: generator of the action which Ansible is to perform in the form of a dictionary
+    that the Ansible library can use. The first argument given is the synchronisation configuration and the second is
+    the synchronisation target location
+    :param ansible_variables_generator: generator of variables to be passed to Ansible, where the argument given is the
+    synchronisation configuration and the return is dictionary where keys are variable names and values of the variable
+    values
     :return: the synchronisations applied
     """
     synchronised: List[FileSyncConfigurationType] = []
@@ -208,7 +211,7 @@ def _synchronise_files(
             os.makedirs(intermediate_directories)
 
         results = run_ansible(tasks=[dict(action=ansible_action_generator(configuration, target))],
-                             variables=ansible_variables_generator(configuration))
+                              variables=ansible_variables_generator(configuration))
         assert len(results) <= 1
         if results[0].is_failed():
             raise RuntimeError(results[0]._result)
@@ -220,6 +223,5 @@ def _synchronise_files(
 
     if not dry_run:
         repository.push_changes(f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'}.")
-    # TODO: Commit but not push if dry run
 
     return synchronised

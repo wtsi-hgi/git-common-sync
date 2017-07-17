@@ -1,12 +1,3 @@
-import traceback
-from typing import Any, Dict, Tuple
-
-from ansible.module_utils.basic import AnsibleModule
-
-from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguration, SubrepoSyncConfiguration, \
-    GitCheckout, SyncConfiguration
-
 EXAMPLES = """
 - gitcommonsync:
     repository: http://www.example.com/repository.git
@@ -31,11 +22,19 @@ EXAMPLES = """
 
 try:
     from gitcommonsync.synchronise import synchronise, Synchronised
-
     _HAS_DEPENDENCIES = True
 except ImportError as e:
     _HAS_DEPENDENCIES = False
     _IMPORT_ERROR = e
+
+import traceback
+from typing import Any, Dict, Tuple
+
+from ansible.module_utils.basic import AnsibleModule
+
+from gitcommonsync._repository import GitRepository
+from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguration, SubrepoSyncConfiguration, \
+    GitCheckout, SyncConfiguration
 
 
 _REPOSITORY_URL_PROPERTY = "repository"
@@ -79,14 +78,15 @@ def fail_if_missing_dependencies(module: AnsibleModule):
             type(_IMPORT_ERROR), _IMPORT_ERROR, _IMPORT_ERROR.__traceback__))
 
 
-def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "SyncConfiguration"]:
+def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "SyncConfiguration"]:
     """
-    TODO
-    :param parameters:
-    :return:
+    Parses the configuration defined in Ansible.
+    :param arguments: the arguments passed to this module by Ansible
+    :return: tuple where the first element is the git repository that is to be synchronised and the seocnd is the
+    configuration that defines how it is to be synchronised
     """
-    repository_location = parameters[_REPOSITORY_URL_PROPERTY]
-    branch = parameters[_REPOSITORY_BRANCH_PROPERTY]
+    repository_location = arguments[_REPOSITORY_URL_PROPERTY]
+    branch = arguments[_REPOSITORY_BRANCH_PROPERTY]
 
     # TODO: Manage key based authentication
     repository = GitRepository(remote=repository_location, branch=branch)
@@ -101,7 +101,7 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "S
             if _TEMPLATE_OVERWRITE_PROPERTY in configuration else False,
             variables=configuration[_TEMPLATE_VARIABLES_PROPERTY]
         )
-        for configuration in parameters[_TEMPLATES_PROPERTY]
+        for configuration in arguments[_TEMPLATES_PROPERTY]
     ]
 
     sync_configuration.files = [
@@ -110,7 +110,7 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "S
             destination=configuration[_FILE_DESTINATION_PROPERTY],
             overwrite=configuration[_FILE_OVERWRITE_PROPERTY] if _FILE_OVERWRITE_PROPERTY in configuration else False
         )
-        for configuration in parameters[_FILES_PROPERTY]
+        for configuration in arguments[_FILES_PROPERTY]
     ]
 
     sync_configuration.subrepos = [
@@ -124,7 +124,7 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "S
             overwrite=configuration[_SUBREPO_OVERWRITE_PROPERTY]
             if _SUBREPO_OVERWRITE_PROPERTY in configuration else False
         )
-        for configuration in parameters[_SUBREPOS_PROPERTY]
+        for configuration in arguments[_SUBREPOS_PROPERTY]
     ]
 
     return repository, sync_configuration
@@ -132,9 +132,9 @@ def parse_configuration(parameters: Dict[str, Any]) -> Tuple["GitRepository", "S
 
 def generate_output_information(synchronised: "Synchronised") -> Dict[str, Any]:
     """
-    TODO
-    :param synchronised:
-    :return:
+    Generates output information based on what synchronisations were applied.
+    :param synchronised: the synchronisations applied
+    :return: output in the form of JSON
     """
     return {
         "files": [synchronisation.destination for synchronisation in synchronised.file_synchronisations],
@@ -145,8 +145,7 @@ def generate_output_information(synchronised: "Synchronised") -> Dict[str, Any]:
 
 def main():
     """
-    TODO
-    :return:
+    Entrypoint.
     """
     module = AnsibleModule(
         argument_spec=_ARGUMENT_SPEC,
