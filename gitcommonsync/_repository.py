@@ -1,11 +1,13 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Dict
+import stat
 
-from git import Repo, GitCommandError, IndexFile, Actor
+from git import Repo, GitCommandError, IndexFile, Actor, Git
 
 DEFAULT_BRANCH = "master"
+SSH_COMMAND = "ssh"
 
 
 def requires_checkout(func):
@@ -25,10 +27,10 @@ class GitRepository:
     """
     Wrapper to simplify basic operations on a specific branch of a repository mirrored from a remote.
     """
-    _REQUIRED_CONFIGS = ["user.name", "user.email"]
+    _REQUIRED_USER_CONFIG_PARAMETERS = ["user.name", "user.email"]
 
     def __init__(self, remote: str, branch: str, *, checkout_location: str=None,
-                 committer_name_and_email: Tuple[str, str]=None):
+                 committer_name_and_email: Tuple[str, str]=None, private_key_file: str=None):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
@@ -37,12 +39,14 @@ class GitRepository:
         :param committer_name_and_email: the commit author to use, where the first element is the author's name and the
         second is the author's email address. If not defined, it will be attempted to get the author from the global
         configuration
+        :param private_key_file: the private key to use when cloning the repository
         """
         self.remote = remote
         self.branch = branch
         self.checkout_location = checkout_location
         self.committer_name = committer_name_and_email[0] if committer_name_and_email is not None else None
         self.committer_email = committer_name_and_email[1] if committer_name_and_email is not None else None
+        self.private_key_file = private_key_file
 
     def tear_down(self):
         """
@@ -62,7 +66,8 @@ class GitRepository:
             raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
 
         self.checkout_location = mkdtemp(dir=parent_directory)
-        repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location)
+        repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location,
+                                     env={"GIT_SSH_COMMAND": self._get_ssh_command()})
 
         repository.heads[self.branch].checkout()
         return self.checkout_location
@@ -76,6 +81,7 @@ class GitRepository:
         """
         self.commit_changes(commit_message, changed_files)
         repository = Repo(self.checkout_location)
+        repository.git.update_environment(GIT_SSH_COMMAND=self._get_ssh_command())
         repository.remotes.origin.push()
 
     @requires_checkout
@@ -111,10 +117,17 @@ class GitRepository:
         if self.committer_name is not None and self.committer_email is not None:
             author = Actor(self.committer_name, self.committer_email)
         else:
-            for config in GitRepository._REQUIRED_CONFIGS:
+            for config in GitRepository._REQUIRED_USER_CONFIG_PARAMETERS:
                 try:
                     index.repo.git.config(config)
                 except GitCommandError as e:
                     raise RuntimeError(f"`git config --global {config}` must be set") from e
             author = None
         index.commit(commit_message, author=author)
+
+    def _get_ssh_command(self) -> str:
+        """
+        Gets the SSH command required to access the repository.
+        :return: the SSH command
+        """
+        return f"{SSH_COMMAND} -i {self.private_key_file}" if self.private_key_file is not None else SSH_COMMAND

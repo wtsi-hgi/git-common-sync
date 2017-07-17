@@ -18,7 +18,7 @@ _A tool to synchronise common files between Git repositories._
 
 ## How to use
 ### Prerequisites
- - git >= 2.10.0 (on path)
+ - git >= 2.10.0
  - git-subrepo >= 0.3.1
  - python >= 3.6
  - rsync >= 3.1.1

@@ -11,6 +11,14 @@ RUN apt-get update \
         unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# Note: Need to install newer version of git than that available for Jessie
+RUN echo "deb http://ftp.debian.org/debian stretch main contrib non-free" >> /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '$ d' /etc/apt/sources.list
+
 ADD test_requirements.txt ${INSTALL_DIRECTORY}
 ADD requirements.txt ${INSTALL_DIRECTORY}
 RUN pip install coverage \

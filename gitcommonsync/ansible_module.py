@@ -3,6 +3,7 @@ EXAMPLES = """
     repository: http://www.example.com/repository.git
     committer_name: Ansible Synchroniser
     committer_email: team@example.com
+    key_file: /custom/id_rsa
     files:
       - src: /example/README.md
         dest: README.md
@@ -43,6 +44,7 @@ _REPOSITORY_URL_PROPERTY = "repository"
 _REPOSITORY_BRANCH_PROPERTY = "branch"
 _REPOSITORY_COMMITTER_NAME_PROPERTY = "committer_name"
 _REPOSITORY_COMMITTER_EMAIL_PROPERTY = "committer_email"
+_REPOSITORY_KEY_FILE_PROPERTY = "key_file"
 
 _TEMPLATES_PROPERTY = "templates"
 _FILES_PROPERTY = "files"
@@ -68,6 +70,7 @@ _ARGUMENT_SPEC = {
     _REPOSITORY_BRANCH_PROPERTY: dict(required=False, default="master", type="str"),
     _REPOSITORY_COMMITTER_NAME_PROPERTY: dict(required=False, type="str"),
     _REPOSITORY_COMMITTER_EMAIL_PROPERTY: dict(required=False, type="str"),
+    _REPOSITORY_KEY_FILE_PROPERTY: dict(required=False, type="str"),
     _TEMPLATES_PROPERTY: dict(required=False, default=[], type="list"),
     _FILES_PROPERTY: dict(required=False, default=[], type="list"),
     _SUBREPOS_PROPERTY: dict(required=False, default=[], type="list")
@@ -96,9 +99,10 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Sy
     branch = arguments[_REPOSITORY_BRANCH_PROPERTY]
     comitter_name = arguments[_REPOSITORY_COMMITTER_NAME_PROPERTY]
     comitter_email = arguments[_REPOSITORY_COMMITTER_EMAIL_PROPERTY]
+    private_key_file = arguments[_REPOSITORY_KEY_FILE_PROPERTY]
 
-    repository = GitRepository(
-        remote=repository_location, branch=branch, committer_name_and_email=(comitter_name, comitter_email))
+    repository = GitRepository(remote=repository_location, branch=branch, private_key_file=private_key_file,
+                               committer_name_and_email=(comitter_name, comitter_email))
 
     sync_configuration = SyncConfiguration()
 
