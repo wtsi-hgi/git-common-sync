@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/wtsi-hgi/git-common-sync.svg?branch=master)](https://travis-ci.org/wtsi-hgi/git-common-sync)
-[![codecov](https://codecov.io/gh/wtsi-hgi/gitcommonsync/branch/master/graph/badge.svg)](https://codecov.io/gh/wtsi-hgi/git-common-sync)
+[![codecov](https://codecov.io/gh/wtsi-hgi/git-common-sync/branch/master/graph/badge.svg)](https://codecov.io/gh/wtsi-hgi/git-common-sync)
 [![PyPI version](https://badge.fury.io/py/gitcommonsync.svg)](https://badge.fury.io/py/gitcommonsync)
 
 
