@@ -1,5 +1,3 @@
-from gitcommonsync.helpers import synchronise
-
 EXAMPLES = """
 - gitcommonsync:
     repository: git@gitlab.example.com:user/repository.git
@@ -29,6 +27,7 @@ try:
     from gitcommonsync.synchronisers import TemplateSynchroniser, Synchronisable
     from gitcommonsync._git import GitRepository, GitCheckout
     from gitcommonsync.models import TemplateSynchronisation, FileSynchronisation, SubrepoSynchronisation
+    from gitcommonsync.helpers import synchronise
     _HAS_DEPENDENCIES = True
 except ImportError as e:
     _HAS_DEPENDENCIES = False
