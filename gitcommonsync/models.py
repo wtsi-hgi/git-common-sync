@@ -6,20 +6,16 @@ from gitcommonsync._git import GitCheckout
 
 class Synchronisation(metaclass=ABCMeta):
     """
-    TOOD
+    Synchronisation configuration.
     """
 
 
 class SubrepoSynchronisation(Synchronisation):
     """
-    Sub-repo synchronisation configuration.
+    Subrepo synchronisation configuration.
     """
     @property
     def destination(self) -> str:
-        """
-        TODO
-        :return:
-        """
         return self.checkout.directory
 
     def __init__(self, checkout: GitCheckout =None, overwrite: bool=False):
@@ -27,7 +23,6 @@ class SubrepoSynchronisation(Synchronisation):
         self.overwrite = overwrite
 
 
-# TODO: Extract shared superclass for this and `TemplateSynchronisation`
 class FileSynchronisation(Synchronisation):
     """
     File synchronisation configuration.

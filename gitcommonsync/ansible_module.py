@@ -84,8 +84,7 @@ _ARGUMENT_SPEC = {
 def fail_if_missing_dependencies(module: AnsibleModule):
     """
     Fails if this module is missing a required dependency.
-    :param module: TODO
-    :return:
+    :param module: the Ansible Module
     """
     if not _HAS_DEPENDENCIES:
         module.fail_json(msg="A required Python module is not installed: %s" % traceback.format_exception(

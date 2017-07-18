@@ -14,15 +14,16 @@ def is_subdirectory(subdirectory: str, directory: str) -> bool:
     return ".." not in os.path.relpath(subdirectory, directory)
 
 
-def get_head_commit(url: str, branch: str) -> str:
+def get_head_commit(location: str, branch: str) -> str:
     """
-    TODO
-    :param branch:
-    :return:
+    Gets the ID of the head commit for the given branch in the Git repository accessible at the given location.
+    :param location: the location of the repository
+    :param branch: the branch of interest
+    :return: the (short) ID of the head commit
     """
     with TemporaryDirectory() as temp_directory:
         subrepo_remote = Repo.init(temp_directory)
-        origin = subrepo_remote.create_remote("origin", url)
+        origin = subrepo_remote.create_remote("origin", location)
         fetch_infos = origin.fetch()
         for fetch_info in fetch_infos:
             if fetch_info.name == f"origin/{branch}":

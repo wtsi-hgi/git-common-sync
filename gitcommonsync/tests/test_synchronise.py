@@ -70,13 +70,13 @@ class _TestWithGitRepository(unittest.TestCase, metaclass=ABCMeta):
 
 class _TestSynchroniser(Generic[SynchroniserType], _TestWithGitRepository, metaclass=ABCMeta):
     """
-    TODO
+    Base class for tests for `Synchroniser`.
     """
     @abstractmethod
     def create_synchroniser(self) -> SynchroniserType:
         """
-        TODO
-        :return:
+        Creates a synchroniser to test with.
+        :return: the synchroniser
         """
 
     def setUp(self):
@@ -265,10 +265,9 @@ class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
 
     def _synchronise_and_assert(self, synchronisation: FileSynchronisation, expect_sync: bool=True):
         """
-        TODO
-        :param synchronisation:
-        :param expect_sync:
-        :return:
+        Performs the given synchronisation and performs basic assertions on the result.
+        :param synchronisation: the synchronisation to perform
+        :param expect_sync: whether to expect the synchronisation to have been performed
         """
         source_md5 = get_md5(synchronisation.source)
         destination_original_md5 = get_md5(synchronisation.destination)

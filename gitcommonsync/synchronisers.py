@@ -20,14 +20,14 @@ FileBasedSynchronisable = TypeVar("FileBasedSynchronisable", bound=FileSynchroni
 
 class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
     """
-    TODO
+    Synchroniser.
     """
     @abstractmethod
     def _synchronise(self, synchronisable: Synchronisable) -> Tuple[bool, str]:
         """
-        TODO
-        :param synchronisable:
-        :return:
+        Synchronise the repository using the given synchronisation configuration.
+        :param synchronisable: see `Synchroniser.synchronise`
+        :return: see `Synchroniser.synchronise`
         """
 
     def __init__(self, repository: GitRepository):
@@ -39,10 +39,10 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
 
     def synchronise(self, synchronisables: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
         """
-        TODO
-        :param synchronisables:
-        :param dry_run:
-        :return:
+        Synchronise the repository with the given synchronisation.
+        :param synchronisables: the synchronisations to apply
+        :param dry_run: will not push changes to the repote if `True`
+        :return: a list of the synchronisations that have been applied
         """
         synchronised: List[Synchronisable] = []
         for synchronisable in synchronisables:
@@ -59,8 +59,8 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
 
     def _prepare_for_synchronise(self, synchronisable: Synchronisable):
         """
-        TODO
-        :param synchronisable:
+        Perpares to apply the given synchronisation.
+        :param synchronisable: the synchronisation that is to be applied
         """
         destination = os.path.join(self.repository.checkout_location, synchronisable.destination)
         target = os.path.join(self.repository.checkout_location, destination)
@@ -125,7 +125,7 @@ class SubrepoSynchroniser(Synchroniser[SubrepoSynchronisation]):
 
 class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileBasedSynchronisable], metaclass=ABCMeta):
     """
-    TODO
+    Base class for any synchronisater that deals with individual files.
     """
     @abstractmethod
     def _synchronise_file(self, synchronisation: FileSynchronisation) -> Tuple[bool, str]:
@@ -171,7 +171,7 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
 
 class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchroniser[Synchronisable], metaclass=ABCMeta):
     """
-    TODO
+    Individual file synchroniser, implemented using Ansible.
     """
     def __init__(
             self, repository: GitRepository,
