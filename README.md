@@ -25,7 +25,31 @@ _A tool to synchronise common files between Git repositories._
 
 
 ### Installation
-
+#### Ansible Module
+```yaml
+- gitcommonsync:
+    repository: http://www.example.com/repository.git
+    committer_name: Ansible Synchroniser
+    committer_email: team@example.com
+    key_file: /custom/id_rsa
+    files:
+      - src: /example/README.md
+        dest: README.md
+        overwrite: false
+      - src: /example/directory/
+        dest: config
+    templates:
+      - src: /example/ansible-groups.sh.j2
+        dest: ci/before_scripts.d/start.sh
+        variables:
+          message: "Hello world"
+        overwrite: true
+    subrepos:
+      - src: http://www.example.com/other-repository.git
+        dest: subrepos/other-repository
+        branch: master
+        overwrite: true
+```
 
 
 ## Development
@@ -52,4 +76,3 @@ If you wish to run the tests inside a Docker container (recommended), build `Doc
 [MIT license](LICENSE.txt).
 
 Copyright (c) 2017 Genome Research Limited
-
