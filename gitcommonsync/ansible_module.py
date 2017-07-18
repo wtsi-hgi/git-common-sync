@@ -40,40 +40,44 @@ from typing import Any, Dict, Tuple, List, Type, DefaultDict
 from ansible.module_utils.basic import AnsibleModule
 
 
-_REPOSITORY_URL_PROPERTY = "repository"
-_REPOSITORY_BRANCH_PROPERTY = "branch"
-_REPOSITORY_COMMITTER_NAME_PROPERTY = "committer_name"
-_REPOSITORY_COMMITTER_EMAIL_PROPERTY = "committer_email"
-_REPOSITORY_KEY_FILE_PROPERTY = "key_file"
+REPOSITORY_URL_PROPERTY = "repository"
+REPOSITORY_BRANCH_PROPERTY = "branch"
+REPOSITORY_COMMITTER_NAME_PROPERTY = "committer_name"
+REPOSITORY_COMMITTER_EMAIL_PROPERTY = "committer_email"
+REPOSITORY_KEY_FILE_PROPERTY = "key_file"
 
-_TEMPLATES_PROPERTY = "templates"
-_FILES_PROPERTY = "files"
-_SUBREPOS_PROPERTY = "subrepos"
+TEMPLATES_PROPERTY = "templates"
+FILES_PROPERTY = "files"
+SUBREPOS_PROPERTY = "subrepos"
 
-_TEMPLATE_SOURCE_PROPERTY = "src"
-_TEMPLATE_DESTINATION_PROPERTY = "dest"
-_TEMPLATE_OVERWRITE_PROPERTY = "overwrite"
-_TEMPLATE_VARIABLES_PROPERTY = "variables"
+TEMPLATE_SOURCE_PROPERTY = "src"
+TEMPLATE_DESTINATION_PROPERTY = "dest"
+TEMPLATE_OVERWRITE_PROPERTY = "overwrite"
+TEMPLATE_VARIABLES_PROPERTY = "variables"
 
-_FILE_SOURCE_PROPERTY = "src"
-_FILE_DESTINATION_PROPERTY = "dest"
-_FILE_OVERWRITE_PROPERTY = "overwrite"
+FILE_SOURCE_PROPERTY = "src"
+FILE_DESTINATION_PROPERTY = "dest"
+FILE_OVERWRITE_PROPERTY = "overwrite"
 
-_SUBREPO_URL_PROPERTY = "src"
-_SUBREPO_BRANCH_PROPERTY = "branch"
-_SUBREPO_COMMIT_PROPERTY = "commit"
-_SUBREPO_DIRECTORY_PROPERTY = "dest"
-_SUBREPO_OVERWRITE_PROPERTY = "overwrite"
+SUBREPO_URL_PROPERTY = "src"
+SUBREPO_BRANCH_PROPERTY = "branch"
+SUBREPO_COMMIT_PROPERTY = "commit"
+SUBREPO_DIRECTORY_PROPERTY = "dest"
+SUBREPO_OVERWRITE_PROPERTY = "overwrite"
+
+CHANGED_TEMPLATES_RETURN_PROPERTY = "templates"
+CHANGED_FILES_RETURN_PROPERTY = "files"
+CHANGED_SUBREPOS_RETURN_PROPERTY = "subrepos"
 
 _ARGUMENT_SPEC = {
-    _REPOSITORY_URL_PROPERTY: dict(required=True, type="str"),
-    _REPOSITORY_BRANCH_PROPERTY: dict(required=False, default="master", type="str"),
-    _REPOSITORY_COMMITTER_NAME_PROPERTY: dict(required=False, type="str"),
-    _REPOSITORY_COMMITTER_EMAIL_PROPERTY: dict(required=False, type="str"),
-    _REPOSITORY_KEY_FILE_PROPERTY: dict(required=False, type="str"),
-    _TEMPLATES_PROPERTY: dict(required=False, default=[], type="list"),
-    _FILES_PROPERTY: dict(required=False, default=[], type="list"),
-    _SUBREPOS_PROPERTY: dict(required=False, default=[], type="list")
+    REPOSITORY_URL_PROPERTY: dict(required=True, type="str"),
+    REPOSITORY_BRANCH_PROPERTY: dict(required=False, default="master", type="str"),
+    REPOSITORY_COMMITTER_NAME_PROPERTY: dict(required=False, type="str"),
+    REPOSITORY_COMMITTER_EMAIL_PROPERTY: dict(required=False, type="str"),
+    REPOSITORY_KEY_FILE_PROPERTY: dict(required=False, type="str"),
+    TEMPLATES_PROPERTY: dict(required=False, default=[], type="list"),
+    FILES_PROPERTY: dict(required=False, default=[], type="list"),
+    SUBREPOS_PROPERTY: dict(required=False, default=[], type="list")
 }
 
 
@@ -88,18 +92,18 @@ def fail_if_missing_dependencies(module: AnsibleModule):
             type(_IMPORT_ERROR), _IMPORT_ERROR, _IMPORT_ERROR.__traceback__))
 
 
-def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "MultiSynchronisation"]:
+def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", List["Synchronisable"]]:
     """
     Parses the configuration defined in Ansible.
     :param arguments: the arguments passed to this module by Ansible
     :return: tuple where the first element is the git repository that is to be synchronised and the seocnd is the
     configuration that defines how it is to be synchronised
     """
-    repository_location = arguments[_REPOSITORY_URL_PROPERTY]
-    branch = arguments[_REPOSITORY_BRANCH_PROPERTY]
-    committer_name = arguments[_REPOSITORY_COMMITTER_NAME_PROPERTY]
-    committer_email = arguments[_REPOSITORY_COMMITTER_EMAIL_PROPERTY]
-    private_key_file = arguments[_REPOSITORY_KEY_FILE_PROPERTY]
+    repository_location = arguments[REPOSITORY_URL_PROPERTY]
+    branch = arguments[REPOSITORY_BRANCH_PROPERTY]
+    committer_name = arguments[REPOSITORY_COMMITTER_NAME_PROPERTY]
+    committer_email = arguments[REPOSITORY_COMMITTER_EMAIL_PROPERTY]
+    private_key_file = arguments[REPOSITORY_KEY_FILE_PROPERTY]
 
     repository = GitRepository(remote=repository_location, branch=branch, private_key_file=private_key_file,
                                committer_name_and_email=(committer_name, committer_email))
@@ -108,55 +112,55 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Mu
 
     synchronisations.extend([
         TemplateSynchronisation(
-            source=configuration[_TEMPLATE_SOURCE_PROPERTY],
-            destination=configuration[_TEMPLATE_DESTINATION_PROPERTY],
-            overwrite=configuration[_TEMPLATE_OVERWRITE_PROPERTY]
-            if _TEMPLATE_OVERWRITE_PROPERTY in configuration else False,
-            variables=configuration[_TEMPLATE_VARIABLES_PROPERTY]
+            source=configuration[TEMPLATE_SOURCE_PROPERTY],
+            destination=configuration[TEMPLATE_DESTINATION_PROPERTY],
+            overwrite=configuration[TEMPLATE_OVERWRITE_PROPERTY]
+            if TEMPLATE_OVERWRITE_PROPERTY in configuration else False,
+            variables=configuration[TEMPLATE_VARIABLES_PROPERTY]
         )
-        for configuration in arguments[_TEMPLATES_PROPERTY]
+        for configuration in arguments[TEMPLATES_PROPERTY]
     ])
 
     synchronisations.extend([
         FileSynchronisation(
-            source=configuration[_FILE_SOURCE_PROPERTY],
-            destination=configuration[_FILE_DESTINATION_PROPERTY],
-            overwrite=configuration[_FILE_OVERWRITE_PROPERTY] if _FILE_OVERWRITE_PROPERTY in configuration else False
+            source=configuration[FILE_SOURCE_PROPERTY],
+            destination=configuration[FILE_DESTINATION_PROPERTY],
+            overwrite=configuration[FILE_OVERWRITE_PROPERTY] if FILE_OVERWRITE_PROPERTY in configuration else False
         )
-        for configuration in arguments[_FILES_PROPERTY]
+        for configuration in arguments[FILES_PROPERTY]
     ])
 
     synchronisations.extend([
         SubrepoSynchronisation(
             checkout=GitCheckout(
-                url=configuration[_SUBREPO_URL_PROPERTY],
-                branch=configuration[_SUBREPO_BRANCH_PROPERTY],
-                commit=configuration[_SUBREPO_COMMIT_PROPERTY] if _SUBREPO_COMMIT_PROPERTY in configuration else None,
-                directory=configuration[_SUBREPO_DIRECTORY_PROPERTY]
+                url=configuration[SUBREPO_URL_PROPERTY],
+                branch=configuration[SUBREPO_BRANCH_PROPERTY],
+                commit=configuration[SUBREPO_COMMIT_PROPERTY] if SUBREPO_COMMIT_PROPERTY in configuration else None,
+                directory=configuration[SUBREPO_DIRECTORY_PROPERTY]
             ),
-            overwrite=configuration[_SUBREPO_OVERWRITE_PROPERTY]
-            if _SUBREPO_OVERWRITE_PROPERTY in configuration else False
+            overwrite=configuration[SUBREPO_OVERWRITE_PROPERTY]
+            if SUBREPO_OVERWRITE_PROPERTY in configuration else False
         )
-        for configuration in arguments[_SUBREPOS_PROPERTY]
+        for configuration in arguments[SUBREPOS_PROPERTY]
     ])
 
     return repository, synchronisations
 
 
-def generate_output_information(synchronised_grouped_by_type: DefaultDict[Type[Synchronisable], List[Synchronisable]]) \
-        -> Dict[str, Any]:
+def generate_output_information(
+        synchronised_grouped_by_type: DefaultDict[Type["Synchronisable"], List["Synchronisable"]]) -> Dict[str, Any]:
     """
     Generates output information based on what synchronisations were applied.
     :param synchronised_grouped_by_type: the synchronisations applied, grouped by type
     :return: output in the form of JSON
     """
     return {
-        "files": [synchronisation.destination for synchronisation in
-                  synchronised_grouped_by_type[FileSynchronisation]],
-        "templates": [synchronisation.destination for synchronisation in
-                      synchronised_grouped_by_type[TemplateSynchronisation]],
-        "subrepos": [synchronisation.checkout.directory for synchronisation in
-                     synchronised_grouped_by_type[SubrepoSynchronisation]]
+        CHANGED_FILES_RETURN_PROPERTY: [synchronisation.destination for synchronisation in
+                                        synchronised_grouped_by_type[FileSynchronisation]],
+        CHANGED_TEMPLATES_RETURN_PROPERTY: [synchronisation.destination for synchronisation in
+                                            synchronised_grouped_by_type[TemplateSynchronisation]],
+        CHANGED_SUBREPOS_RETURN_PROPERTY: [synchronisation.checkout.directory for synchronisation in
+                                           synchronised_grouped_by_type[SubrepoSynchronisation]]
     }
 
 
