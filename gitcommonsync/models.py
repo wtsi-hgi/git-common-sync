@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from typing import Dict
 
-from gitcommonsync._git import GitCheckout
+from gitcommonsync.repository import GitCheckout
 
 
 class Synchronisation(metaclass=ABCMeta):

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import List, Dict, Type, DefaultDict
 
-from gitcommonsync._git import GitRepository
+from gitcommonsync.repository import GitRepository
 from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation
 from gitcommonsync.synchronisers import FileSynchroniser, TemplateSynchroniser, SubrepoSynchroniser, Synchronisable, \
     Synchroniser

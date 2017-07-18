@@ -9,7 +9,7 @@ import gitsubrepo
 from gitcommonsync._ansible_runner import ANSIBLE_RSYNC_MODULE_NAME, ANSIBLE_TEMPLATE_MODULE_NAME, \
     run_ansible
 from gitcommonsync._common import is_subdirectory, get_head_commit
-from gitcommonsync._git import GitRepository, GitCheckout
+from gitcommonsync.repository import GitRepository, GitCheckout
 from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation, Synchronisation
 
 _logger = logging.getLogger(__name__)

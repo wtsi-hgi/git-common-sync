@@ -25,7 +25,7 @@ EXAMPLES = """
 
 try:
     from gitcommonsync.synchronisers import TemplateSynchroniser, Synchronisable
-    from gitcommonsync._git import GitRepository, GitCheckout
+    from gitcommonsync.repository import GitRepository, GitCheckout
     from gitcommonsync.models import TemplateSynchronisation, FileSynchronisation, SubrepoSynchronisation
     from gitcommonsync.helpers import synchronise
     _HAS_DEPENDENCIES = True

@@ -14,7 +14,7 @@ from git import Repo
 from gitcommonsync._ansible_runner import ANSIBLE_TEMPLATE_MODULE_NAME, run_ansible
 from gitsubrepo.exceptions import NotAGitSubrepoException
 
-from gitcommonsync._git import GitRepository, GitCheckout
+from gitcommonsync.repository import GitRepository, GitCheckout
 from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation
 from gitcommonsync.synchronisers import Synchroniser, SubrepoSynchroniser, FileSynchroniser, TemplateSynchroniser
 from gitcommonsync.tests._common import get_md5, is_accessible
