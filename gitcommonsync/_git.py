@@ -1,7 +1,7 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Tuple, Dict
+from typing import List, Callable, Tuple, Dict, Any
 import stat
 
 from git import Repo, GitCommandError, IndexFile, Actor, Git
@@ -21,6 +21,24 @@ def requires_checkout(func):
             raise NotADirectoryError("Repository must be checked out")
         return func(self, *args, **kwargs)
     return decorated
+
+
+class GitCheckout:
+    """
+    Git checkout.
+    """
+    def __init__(self, url: str, branch: str, directory: str, *, commit: str=None):
+        self.url = url
+        self.branch = branch
+        self.directory = directory
+        self.commit = commit
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, type(self)) \
+               and other.url == self.url \
+               and other.branch == self.branch \
+               and other.commit == self.commit \
+               and other.directory == self.directory
 
 
 class GitRepository:

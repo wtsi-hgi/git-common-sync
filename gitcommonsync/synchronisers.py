@@ -2,66 +2,20 @@ import logging
 import os
 import shutil
 from abc import ABCMeta, abstractmethod
-from tempfile import TemporaryDirectory
-from typing import List, Dict, Callable, Type, TypeVar, Generic, Tuple
+from typing import List, Dict, Callable, TypeVar, Generic, Tuple
 
 import gitsubrepo
-from git import Repo
 
 from gitcommonsync._ansible_runner import ANSIBLE_RSYNC_MODULE_NAME, ANSIBLE_TEMPLATE_MODULE_NAME, \
     run_ansible
 from gitcommonsync._common import is_subdirectory, get_head_commit
-from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import FileSyncConfiguration, SyncConfiguration, SubrepoSyncConfiguration, GitCheckout, \
-    TemplateSyncConfiguration
+from gitcommonsync._git import GitRepository, GitCheckout
+from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation, Synchronisation
 
 _logger = logging.getLogger(__name__)
 
-Synchronisable = TypeVar("Synchronisable", bound=SyncConfiguration)
-FileBasedSynchronisable = TypeVar("FileBasedSynchronisable", bound=FileSyncConfiguration)
-
-
-# # FIXME: This is ~the same model as `SyncConfiguration`
-# class Synchronised:
-#     """
-#     Changes that happened during the synchronisation.
-#     """
-#     def __init__(self):
-#         self.file_synchronisations: List[FileSyncConfiguration] = None
-#         self.subrepo_synchronisations: List[SubrepoSyncConfiguration] = None
-#         self.template_synchronisations: List[TemplateSyncConfiguration] = None
-#
-#     def get_number_of_synchronisations(self) -> int:
-#         """
-#         TODO
-#         :return:
-#         """
-#         return len(self.file_synchronisations) + len(self.subrepo_synchronisations) \
-#                + len(self.template_synchronisations)
-
-
-
-# def synchronise(repository: GitRepository, configuration: SyncConfiguration, dry_run: bool=False) \
-#         -> Synchronised:
-#     """
-#     Clones, updates and commits to the given repository, according to the given synchronisation configuration.
-#     :param repository: the git repository
-#     :param configuration: the synchronisation configuration
-#     :param dry_run: does not push changes back if set to True
-#     :return: the synchronisations applied
-#     """
-#     repository.checkout()
-#     changed = Synchronised()
-#     try:
-#         changed.subrepo_synchronisations = synchronise_subrepos(repository, configuration.subrepos, dry_run=dry_run)
-#         changed.file_synchronisations = synchronise_files(repository, configuration.files, dry_run=dry_run)
-#         changed.template_synchronisations = synchronise_templates(repository, configuration.templates, dry_run=dry_run)
-#     finally:
-#         repository.tear_down()
-#     return changed
-#
-
-
+Synchronisable = TypeVar("Synchronisable", bound=Synchronisation)
+FileBasedSynchronisable = TypeVar("FileBasedSynchronisable", bound=FileSynchronisation)
 
 
 class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
@@ -69,50 +23,50 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
     TODO
     """
     @abstractmethod
-    def _synchronise(self, configuration: Synchronisable) -> Tuple[bool, str]:
+    def _synchronise(self, synchronisable: Synchronisable) -> Tuple[bool, str]:
         """
         TODO
-        :param configuration:
+        :param synchronisable:
         :return:
         """
 
     def __init__(self, repository: GitRepository):
         """
-        TODO
-        :param repository:
-        :param dry_run:
+        Constructor.
+        :param repository: the git repository to synchronise
         """
         self.repository = repository
 
-    def synchronise(self, configurations: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
+    def synchronise(self, synchronisables: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
         """
         TODO
+        :param synchronisables:
+        :param dry_run:
         :return:
         """
         synchronised: List[Synchronisable] = []
-        for configuration in configurations:
-            self._prepare_for_synchronise(configuration)
-            was_synchronised, reason = self._synchronise(configuration)
+        for synchronisable in synchronisables:
+            self._prepare_for_synchronise(synchronisable)
+            was_synchronised, reason = self._synchronise(synchronisable)
             # TODO: Do something useful with the reasons
             if was_synchronised:
-                synchronised.append(configuration)
+                synchronised.append(synchronisable)
 
         if len(synchronised) > 0 and not dry_run:
             self.repository.push()
 
         return synchronised
 
-    def _prepare_for_synchronise(self, configuration: Synchronisable):
+    def _prepare_for_synchronise(self, synchronisable: Synchronisable):
         """
         TODO
-        :param configuration:
-        :return:
+        :param synchronisable:
         """
-        destination = os.path.join(self.repository.checkout_location, configuration.destination)
+        destination = os.path.join(self.repository.checkout_location, synchronisable.destination)
         target = os.path.join(self.repository.checkout_location, destination)
 
         if not is_subdirectory(destination, self.repository.checkout_location):
-            raise ValueError(f"Destination {configuration.destination} not inside of repository "
+            raise ValueError(f"Destination {synchronisable.destination} not inside of repository "
                              f"({os.path.realpath(target)})")
 
         intermediate_directories = os.path.dirname(target)
@@ -121,13 +75,13 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
             os.makedirs(intermediate_directories)
 
 
-class SubrepoSynchroniser(Synchroniser[SubrepoSyncConfiguration]):
+class SubrepoSynchroniser(Synchroniser[SubrepoSynchronisation]):
     """
-    TODO
+    Subrepo synchroniser.
     """
-    def _synchronise(self, configuration: SubrepoSyncConfiguration) -> Tuple[bool, str]:
-        destination = os.path.join(self.repository.checkout_location, configuration.destination)
-        required_checkout = configuration.checkout
+    def _synchronise(self, synchronisable: SubrepoSynchronisation) -> Tuple[bool, str]:
+        destination = os.path.join(self.repository.checkout_location, synchronisable.destination)
+        required_checkout = synchronisable.checkout
         force_update = False
 
         if os.path.exists(destination):
@@ -141,7 +95,7 @@ class SubrepoSynchroniser(Synchroniser[SubrepoSyncConfiguration]):
 
             if current_checkout == required_checkout:
                 return False, f"Subrepo at {required_checkout.directory} is synchronised"
-            elif not configuration.overwrite:
+            elif not synchronisable.overwrite:
                 return False, f"Subrepo at {required_checkout.directory} is not synchronised but not updating as " \
                               f"overwrite=False"
             elif same_url_and_branch:
@@ -174,31 +128,31 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
     TODO
     """
     @abstractmethod
-    def _synchronise_file(self, configuration: FileSyncConfiguration) -> Tuple[bool, str]:
+    def _synchronise_file(self, synchronisation: FileSynchronisation) -> Tuple[bool, str]:
         """
-        Synchronises a file as defined by the given configuration.
-        :param configuration: the synchronisation configuration
+        Synchronises a file as defined by the given synchronisation configuration.
+        :param synchronisation: the synchronisation configuration
         :return: tuple whether the first element is a boolean that indicates if the file was synchronised and the second
         is a human readable string detailing the reason for the choice to synchronise or not
         """
 
-    def _prepare_for_synchronise(self, configuration: FileSyncConfiguration):
-        if not os.path.exists(configuration.source):
-            raise FileNotFoundError(configuration.source)
-        if not os.path.isabs(configuration.source):
-            raise ValueError(f"Sources cannot be relative: {configuration.source}")
-        return super()._prepare_for_synchronise(configuration)
+    def _prepare_for_synchronise(self, synchronisable: FileSynchronisation):
+        if not os.path.exists(synchronisable.source):
+            raise FileNotFoundError(synchronisable.source)
+        if not os.path.isabs(synchronisable.source):
+            raise ValueError(f"Sources cannot be relative: {synchronisable.source}")
+        return super()._prepare_for_synchronise(synchronisable)
 
-    def _synchronise(self, configuration: FileSyncConfiguration) -> Tuple[bool, str]:
-        destination = os.path.join(self.repository.checkout_location, configuration.destination)
+    def _synchronise(self, synchronisable: FileSynchronisation) -> Tuple[bool, str]:
+        destination = os.path.join(self.repository.checkout_location, synchronisable.destination)
         target = os.path.join(self.repository.checkout_location, destination)
 
-        if os.path.exists(target) and not configuration.overwrite:
-            return False, f"{configuration.source} != {target} (overwrite={configuration.overwrite})"
+        if os.path.exists(target) and not synchronisable.overwrite:
+            return False, f"{synchronisable.source} != {target} (overwrite={synchronisable.overwrite})"
 
-        was_synchronised, reason = self._synchronise_file(configuration)
+        was_synchronised, reason = self._synchronise_file(synchronisable)
         if was_synchronised:
-            self.repository.commit(f"Synchronised {configuration.source}.", )
+            self.repository.commit(f"Synchronised {synchronisable.source}.", )
 
         return was_synchronised, reason
 
@@ -209,8 +163,8 @@ class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchronis
     """
     def __init__(
             self, repository: GitRepository,
-            ansible_action_generator: Callable[[FileSyncConfiguration, str], Dict],
-            ansible_variables_generator: Callable[[FileSyncConfiguration], Dict[str, str]]=lambda configuration: {}):
+            ansible_action_generator: Callable[[FileSynchronisation, str], Dict],
+            ansible_variables_generator: Callable[[FileSynchronisation], Dict[str, str]]=lambda synchronisation: {}):
         """
         Constructor.
         :param repository: see `Synchroniser.__init__`
@@ -225,28 +179,28 @@ class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchronis
         self.ansible_action_generator = ansible_action_generator
         self.ansible_variables_generator = ansible_variables_generator
 
-    def _synchronise_file(self, configuration: FileSyncConfiguration) -> Tuple[bool, str]:
-        destination = os.path.join(self.repository.checkout_location, configuration.destination)
+    def _synchronise_file(self, synchronisation: FileSynchronisation) -> Tuple[bool, str]:
+        destination = os.path.join(self.repository.checkout_location, synchronisation.destination)
         target = os.path.join(self.repository.checkout_location, destination)
 
-        results = run_ansible(tasks=[dict(action=self.ansible_action_generator(configuration, target))],
-                              variables=self.ansible_variables_generator(configuration))
+        results = run_ansible(tasks=[dict(action=self.ansible_action_generator(synchronisation, target))],
+                              variables=self.ansible_variables_generator(synchronisation))
         assert len(results) <= 1
         if results[0].is_failed():
             raise RuntimeError(results[0]._result)
         if results[0].is_changed():
-            return True, f"{configuration.source} => {target} (overwrite={configuration.overwrite})"
+            return True, f"{synchronisation.source} => {target} (overwrite={synchronisation.overwrite})"
         else:
-            return False, f"{configuration.source} == {target}"
+            return False, f"{synchronisation.source} == {target}"
 
 
-class FileSynchroniser(_AnsibleFileBasedSynchroniser[FileSyncConfiguration]):
+class FileSynchroniser(_AnsibleFileBasedSynchroniser[FileSynchronisation]):
     """
-    TODO
+    File synchroniser.
     """
-    _ANSIBLE_ACTION_GENERATOR = lambda configuration, target: dict(
+    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: dict(
         module=ANSIBLE_RSYNC_MODULE_NAME,
-        args=dict(src=configuration.source, dest=target, recursive=True, delete=True, archive=False, perms=True,
+        args=dict(src=synchronisation.source, dest=target, recursive=True, delete=True, archive=False, perms=True,
                   links=True, checksum=True)
     )
 
@@ -254,13 +208,13 @@ class FileSynchroniser(_AnsibleFileBasedSynchroniser[FileSyncConfiguration]):
         super().__init__(repository, FileSynchroniser._ANSIBLE_ACTION_GENERATOR)
 
 
-class TemplateSynchroniser(_AnsibleFileBasedSynchroniser[TemplateSyncConfiguration]):
+class TemplateSynchroniser(_AnsibleFileBasedSynchroniser[TemplateSynchronisation]):
     """
-    TODO
+    Template based file synchroniser.
     """
-    _ANSIBLE_ACTION_GENERATOR = lambda configuration, target: dict(module=ANSIBLE_TEMPLATE_MODULE_NAME,
-                                                                   args=dict(src=configuration.source, dest=target))
-    _ANSIBLE_VARIABLES_GENERATOR = lambda configuration: configuration.variables
+    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: dict(module=ANSIBLE_TEMPLATE_MODULE_NAME,
+                                                                     args=dict(src=synchronisation.source, dest=target))
+    _ANSIBLE_VARIABLES_GENERATOR = lambda synchronisation: synchronisation.variables
 
     def __init__(self, repository: GitRepository):
         super().__init__(repository, TemplateSynchroniser._ANSIBLE_ACTION_GENERATOR,

@@ -14,9 +14,9 @@ from git import Repo
 from gitcommonsync._ansible_runner import ANSIBLE_TEMPLATE_MODULE_NAME, run_ansible
 from gitsubrepo.exceptions import NotAGitSubrepoException
 
-from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import FileSyncConfiguration, GitCheckout, SubrepoSyncConfiguration, TemplateSyncConfiguration
-from gitcommonsync.synchronise import Synchroniser, SubrepoSynchroniser, FileSynchroniser, TemplateSynchroniser
+from gitcommonsync._git import GitRepository, GitCheckout
+from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation
+from gitcommonsync.synchronisers import Synchroniser, SubrepoSynchroniser, FileSynchroniser, TemplateSynchroniser
 from gitcommonsync.tests._common import get_md5, is_accessible
 from gitcommonsync.tests.resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
     BRANCH, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH, DIRECTORY_1
@@ -86,7 +86,7 @@ class _TestSynchroniser(Generic[SynchroniserType], _TestWithGitRepository, metac
 
 class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
     """
-    TODO
+    Tests for `SubrepoSynchroniser`.
     """
     def create_synchroniser(self) -> SubrepoSynchroniser:
         return SubrepoSynchroniser(self.git_repository)
@@ -97,42 +97,42 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         self.git_subrepo_directory = os.path.join(self.git_directory, self.git_checkout.directory)
 
     def test_sync_onto_existing_non_subrepo_directory(self):
-        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
+        synchronisations = [SubrepoSynchronisation(self.git_checkout)]
         os.makedirs(self.git_subrepo_directory)
-        self.assertRaises(NotAGitSubrepoException, self.synchroniser.synchronise, configurations)
+        self.assertRaises(NotAGitSubrepoException, self.synchroniser.synchronise, synchronisations)
 
     def test_sync_to_directory_outside_repository(self):
         self.git_checkout.directory = self.external_git_repository_location
-        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
-        self.assertRaises(ValueError, self.synchroniser.synchronise, configurations)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout)]
+        self.assertRaises(ValueError, self.synchroniser.synchronise, synchronisations)
 
     def test_sync_new_subrepo(self):
         self.git_checkout.commit = GIT_MASTER_HEAD_COMMIT
-        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         self.assertEqual(self.external_git_repository_md5, get_md5(self.git_subrepo_directory))
         self.assertEqual(self.git_checkout.commit[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
     def test_sync_up_to_date_subrepo(self):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
-        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
 
     @unittest.skipIf(not is_accessible(GITHUB_TEST_REPOSITORY), "Could not connect to GitHub")
     def test_sync_new_subrepo_from_github(self):
         self.git_checkout.url = GITHUB_TEST_REPOSITORY
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch)
-        configurations = [SubrepoSyncConfiguration(self.git_checkout)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
 
     def test_sync_out_of_date_subrepo_no_override(self):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch,
               commit=GIT_MASTER_OLD_COMMIT)
-        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=False)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=False)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
         self.assertEqual(GIT_MASTER_OLD_COMMIT[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
@@ -147,9 +147,9 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         updated_repository.push()
         Repo(self.git_repository.checkout_location).remotes.origin.pull()
 
-        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         self.assertTrue(os.path.exists(os.path.join(self.git_subrepo_directory, NEW_FILE_1)))
 
     def test_sync_out_of_date_subrepo_to_intermediate_commit(self):
@@ -157,16 +157,16 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_MASTER_BRANCH)
         # Push the clone commit
         self.git_repository.push()
-        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         self.assertEqual(self.git_checkout.commit[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
     def test_sync_subrepo_to_different_branch(self):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_DEVELOP_BRANCH)
-        configurations = [SubrepoSyncConfiguration(self.git_checkout, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         url, branch, commit = gitsubrepo.status(self.git_subrepo_directory)
         self.assertEqual(GIT_MASTER_HEAD_COMMIT[0:7], commit)
         self.assertEqual(GIT_MASTER_BRANCH, branch)
@@ -179,19 +179,19 @@ class _TestFileBasedSynchroniser(Generic[SynchroniserType], _TestSynchroniser[Sy
     def test_sync_non_existent_file(self):
         source = os.path.join(self.temp_directory, "does-not-exist")
         destination = os.path.join(self.git_directory, FILE_1)
-        configuration = [FileSyncConfiguration(source, destination)]
-        self.assertRaises(FileNotFoundError, self.synchroniser.synchronise, configuration)
+        synchronisations = [FileSynchronisation(source, destination)]
+        self.assertRaises(FileNotFoundError, self.synchroniser.synchronise, synchronisations)
 
     def test_sync_to_outside_repository(self):
         source, _ = self.create_test_file()
         destination = os.path.join(self.git_directory, "..", FILE_1)
-        configuration = [FileSyncConfiguration(source, destination)]
-        self.assertRaises(ValueError, self.synchroniser.synchronise, configuration)
+        synchronisations = [FileSynchronisation(source, destination)]
+        self.assertRaises(ValueError, self.synchroniser.synchronise, synchronisations)
 
 
 class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
     """
-    TODO
+    Tests for `FileSynchroniser`.
     """
     def create_synchroniser(self) -> FileSynchroniser:
         return FileSynchroniser(self.git_repository)
@@ -200,50 +200,50 @@ class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
         destination = os.path.join(self.git_directory, FILE_1)
         source, _ = self.create_test_file()
         shutil.copy(destination, source)
-        configurations = [FileSyncConfiguration(source, destination, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronisations = [FileSynchronisation(source, destination, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual(0, len(synchronised))
 
     def test_sync_up_to_date_directory(self):
         source = os.path.join(self.temp_directory, DIRECTORY_1) + os.path.sep
         destination = os.path.join(self.git_directory, DIRECTORY_1)
         shutil.copytree(destination, source)
-        configurations = [FileSyncConfiguration(source, destination, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronisations = [FileSynchronisation(source, destination, overwrite=True)]
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual(0, len(synchronised))
 
     def test_sync_new_file(self):
         source, source_md5 = self.create_test_file()
         destination = os.path.join(self.git_directory, NEW_FILE_1)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=False))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=False))
 
     def test_sync_new_directory(self):
         source, source_md5 = self.create_test_directory()
         destination = os.path.join(self.git_directory, NEW_DIRECTORY_1)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=False))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=False))
 
     def test_sync_with_new_intermediate_directories(self):
         source, source_md5 = self.create_test_file()
         destination = os.path.join(self.git_directory, NEW_DIRECTORY_1, NEW_FILE_1)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=False))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=False))
 
     def test_sync_out_of_date_file_when_no_overwrite(self):
         source, source_md5 = self.create_test_file()
         destination = os.path.join(self.git_directory, FILE_1)
         assert source_md5 != get_md5(destination)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=False), expect_sync=False)
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=False), expect_sync=False)
 
     def test_sync_out_of_date_directory_when_no_overwrite(self):
         source, source_md5 = self.create_test_directory()
         destination = os.path.join(self.git_directory, DIRECTORY_1)
         assert source_md5 != get_md5(destination)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=False), expect_sync=False)
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=False), expect_sync=False)
 
     def test_sync_out_of_date_file_when_overwrite(self):
         source, source_md5 = self.create_test_file()
         destination = os.path.join(self.git_directory, FILE_1)
         assert source_md5 != get_md5(destination)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=True))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=True))
 
     def test_sync_out_of_date_directory_when_overwrite(self):
         source, source_md5 = self.create_test_directory()
@@ -251,7 +251,7 @@ class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
         source += os.path.sep
         destination = os.path.join(self.git_directory, DIRECTORY_1)
         assert source_md5 != get_md5(destination)
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=True))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=True))
 
     def test_sync_permissions_change(self):
         destination = os.path.join(self.git_directory, FILE_1)
@@ -260,27 +260,27 @@ class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
         permissions = 770
         os.chmod(source, permissions)
         assert stat.S_IMODE(os.lstat(source).st_mode) == 770
-        self._synchronise_and_assert(FileSyncConfiguration(source, destination, overwrite=True))
+        self._synchronise_and_assert(FileSynchronisation(source, destination, overwrite=True))
         self.assertEqual(770, stat.S_IMODE(os.lstat(destination).st_mode))
 
-    def _synchronise_and_assert(self, configuration: FileSyncConfiguration, expect_sync: bool=True):
+    def _synchronise_and_assert(self, synchronisation: FileSynchronisation, expect_sync: bool=True):
         """
         TODO
-        :param configuration:
+        :param synchronisation:
         :param expect_sync:
         :return:
         """
-        source_md5 = get_md5(configuration.source)
-        destination_original_md5 = get_md5(configuration.destination)
-        synchronised = self.synchroniser.synchronise([configuration])
+        source_md5 = get_md5(synchronisation.source)
+        destination_original_md5 = get_md5(synchronisation.destination)
+        synchronised = self.synchroniser.synchronise([synchronisation])
 
         if expect_sync:
-            self.assertEqual([configuration], synchronised)
-            self.assertEqual(get_md5(configuration.source), get_md5(configuration.destination))
+            self.assertEqual([synchronisation], synchronised)
+            self.assertEqual(get_md5(synchronisation.source), get_md5(synchronisation.destination))
         else:
             self.assertEqual(0, len(synchronised))
-            self.assertEqual(destination_original_md5, get_md5(configuration.destination))
-        self.assertEqual(source_md5, get_md5(configuration.source))
+            self.assertEqual(destination_original_md5, get_md5(synchronisation.destination))
+        self.assertEqual(source_md5, get_md5(synchronisation.source))
 
         repository = Repo(self.git_directory)
         self.assertFalse(Repo(self.git_directory).is_dirty(), msg=repository.git.diff())
@@ -288,7 +288,7 @@ class TestFileSynchroniser(_TestFileBasedSynchroniser[FileSynchroniser]):
 
 class TestTemplateSynchroniser(_TestFileBasedSynchroniser[TemplateSynchroniser]):
     """
-    TODO
+    Tests for `TemplateSynchroniser`.
     """
     def create_synchroniser(self) -> TemplateSynchroniser:
         return TemplateSynchroniser(self.git_repository)
@@ -299,40 +299,40 @@ class TestTemplateSynchroniser(_TestFileBasedSynchroniser[TemplateSynchroniser])
         self.template_destination = os.path.join(self.git_directory, NEW_FILE_1)
 
     def test_sync_template_with_incomplete_variables(self):
-        configurations = [TemplateSyncConfiguration(self.template_source, self.template_destination, variables={})]
-        self.assertRaises(RuntimeError, self.synchroniser.synchronise, configurations)
+        synchronisations = [TemplateSynchronisation(self.template_source, self.template_destination, variables={})]
+        self.assertRaises(RuntimeError, self.synchroniser.synchronise, synchronisations)
 
     def test_sync_new_template(self):
-        configurations = [TemplateSyncConfiguration(
+        synchronisations = [TemplateSynchronisation(
             self.template_source, self.template_destination, variables=TEMPLATE_VARIABLES)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         self.assertTrue(os.path.exists(self.template_destination))
         with open(self.template_destination, "r") as file:
             self.assertEqual(TEMPLATE_VARIABLES, json.load(file))
 
     def test_sync_up_to_date_template(self):
         self._write_template()
-        configurations = [TemplateSyncConfiguration(
+        synchronisations = [TemplateSynchronisation(
             self.template_source, self.template_destination, variables=TEMPLATE_VARIABLES, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
 
     def test_sync_out_of_date_date_template_without_overwrite(self):
         self._write_template()
         altered_variables = {key: f"{value}-2" for key, value in TEMPLATE_VARIABLES.items()}
-        configurations = [TemplateSyncConfiguration(
+        synchronisations = [TemplateSynchronisation(
             self.template_source, self.template_destination, variables=altered_variables, overwrite=False)]
-        synchronised = self.synchroniser.synchronise(configurations)
+        synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
 
     def test_sync_out_of_date_date_template_with_overwrite(self):
         self._write_template()
         altered_variables = {key: f"{value}-2" for key, value in TEMPLATE_VARIABLES.items()}
-        configurations = [TemplateSyncConfiguration(
+        synchronisations = [TemplateSynchronisation(
             self.template_source, self.template_destination, variables=altered_variables, overwrite=True)]
-        synchronised = self.synchroniser.synchronise(configurations)
-        self.assertEqual(configurations, synchronised)
+        synchronised = self.synchroniser.synchronise(synchronisations)
+        self.assertEqual(synchronisations, synchronised)
         with open(self.template_destination, "r") as file:
             self.assertEqual(altered_variables, json.load(file))
 

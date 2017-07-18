@@ -1,3 +1,5 @@
+from gitcommonsync.helpers import synchronise
+
 EXAMPLES = """
 - gitcommonsync:
     repository: http://www.example.com/repository.git
@@ -24,17 +26,16 @@ EXAMPLES = """
 """
 
 try:
-    from gitcommonsync.synchronise import synchronise, Synchronised
-    from gitcommonsync._repository import GitRepository
-    from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguration, SubrepoSyncConfiguration, \
-        GitCheckout, SyncConfiguration
+    from gitcommonsync.synchronisers import TemplateSynchroniser, Synchronisable
+    from gitcommonsync._git import GitRepository, GitCheckout
+    from gitcommonsync.models import TemplateSynchronisation, FileSynchronisation, SubrepoSynchronisation
     _HAS_DEPENDENCIES = True
 except ImportError as e:
     _HAS_DEPENDENCIES = False
     _IMPORT_ERROR = e
 
 import traceback
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List, Type, DefaultDict
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -87,7 +88,7 @@ def fail_if_missing_dependencies(module: AnsibleModule):
             type(_IMPORT_ERROR), _IMPORT_ERROR, _IMPORT_ERROR.__traceback__))
 
 
-def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "SyncConfiguration"]:
+def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "MultiSynchronisation"]:
     """
     Parses the configuration defined in Ansible.
     :param arguments: the arguments passed to this module by Ansible
@@ -96,17 +97,17 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Sy
     """
     repository_location = arguments[_REPOSITORY_URL_PROPERTY]
     branch = arguments[_REPOSITORY_BRANCH_PROPERTY]
-    comitter_name = arguments[_REPOSITORY_COMMITTER_NAME_PROPERTY]
-    comitter_email = arguments[_REPOSITORY_COMMITTER_EMAIL_PROPERTY]
+    committer_name = arguments[_REPOSITORY_COMMITTER_NAME_PROPERTY]
+    committer_email = arguments[_REPOSITORY_COMMITTER_EMAIL_PROPERTY]
     private_key_file = arguments[_REPOSITORY_KEY_FILE_PROPERTY]
 
     repository = GitRepository(remote=repository_location, branch=branch, private_key_file=private_key_file,
-                               committer_name_and_email=(comitter_name, comitter_email))
+                               committer_name_and_email=(committer_name, committer_email))
 
-    sync_configuration = SyncConfiguration()
+    synchronisations: List[Synchronisable] = []
 
-    sync_configuration.templates = [
-        TemplateSyncConfiguration(
+    synchronisations.extend([
+        TemplateSynchronisation(
             source=configuration[_TEMPLATE_SOURCE_PROPERTY],
             destination=configuration[_TEMPLATE_DESTINATION_PROPERTY],
             overwrite=configuration[_TEMPLATE_OVERWRITE_PROPERTY]
@@ -114,19 +115,19 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Sy
             variables=configuration[_TEMPLATE_VARIABLES_PROPERTY]
         )
         for configuration in arguments[_TEMPLATES_PROPERTY]
-    ]
+    ])
 
-    sync_configuration.files = [
-        FileSyncConfiguration(
+    synchronisations.extend([
+        FileSynchronisation(
             source=configuration[_FILE_SOURCE_PROPERTY],
             destination=configuration[_FILE_DESTINATION_PROPERTY],
             overwrite=configuration[_FILE_OVERWRITE_PROPERTY] if _FILE_OVERWRITE_PROPERTY in configuration else False
         )
         for configuration in arguments[_FILES_PROPERTY]
-    ]
+    ])
 
-    sync_configuration.subrepos = [
-        SubrepoSyncConfiguration(
+    synchronisations.extend([
+        SubrepoSynchronisation(
             checkout=GitCheckout(
                 url=configuration[_SUBREPO_URL_PROPERTY],
                 branch=configuration[_SUBREPO_BRANCH_PROPERTY],
@@ -137,21 +138,25 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", "Sy
             if _SUBREPO_OVERWRITE_PROPERTY in configuration else False
         )
         for configuration in arguments[_SUBREPOS_PROPERTY]
-    ]
+    ])
 
-    return repository, sync_configuration
+    return repository, synchronisations
 
 
-def generate_output_information(synchronised: "Synchronised") -> Dict[str, Any]:
+def generate_output_information(synchronised_grouped_by_type: DefaultDict[Type[Synchronisable], List[Synchronisable]]) \
+        -> Dict[str, Any]:
     """
     Generates output information based on what synchronisations were applied.
-    :param synchronised: the synchronisations applied
+    :param synchronised_grouped_by_type: the synchronisations applied, grouped by type
     :return: output in the form of JSON
     """
     return {
-        "files": [synchronisation.destination for synchronisation in synchronised.file_synchronisations],
-        "templates": [synchronisation.destination for synchronisation in synchronised.template_synchronisations],
-        "subrepos": [synchronisation.checkout.directory for synchronisation in synchronised.subrepo_synchronisations]
+        "files": [synchronisation.destination for synchronisation in
+                  synchronised_grouped_by_type[FileSynchronisation]],
+        "templates": [synchronisation.destination for synchronisation in
+                      synchronised_grouped_by_type[TemplateSynchronisation]],
+        "subrepos": [synchronisation.checkout.directory for synchronisation in
+                     synchronised_grouped_by_type[SubrepoSynchronisation]]
     }
 
 
@@ -164,15 +169,16 @@ def main():
         supports_check_mode=True
     )
     fail_if_missing_dependencies(module)
-    repository, sync_configuration = parse_configuration(module.params)
+    repository, synchronisations = parse_configuration(module.params)
 
-    synchronised = synchronise(repository, sync_configuration, dry_run=module.check_mode)
+    synchronised_grouped_by_type = synchronise(repository, synchronisations, dry_run=module.check_mode)
     # TODO: Consider catchable exceptions
-    assert synchronised.get_number_of_synchronisations() >= 0
-    assert synchronised.get_number_of_synchronisations() <= sync_configuration.get_number_of_synchronisations()
+    number_synchronised = len(sum(list(synchronised_grouped_by_type.values()), []))
+    assert number_synchronised >= 0
+    assert number_synchronised <= len(synchronisations)
 
-    module.exit_json(changed=synchronised.get_number_of_synchronisations() > 0,
-                     synchronised=generate_output_information(synchronised))
+    module.exit_json(changed=number_synchronised > 0, synchronised=generate_output_information(
+        synchronised_grouped_by_type))
 
 
 if __name__ == "__main__":
