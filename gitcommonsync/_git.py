@@ -1,7 +1,7 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Tuple, Dict
+from typing import List, Callable, Tuple, Dict, Any
 import stat
 
 from git import Repo, GitCommandError, IndexFile, Actor, Git
@@ -21,6 +21,24 @@ def requires_checkout(func):
             raise NotADirectoryError("Repository must be checked out")
         return func(self, *args, **kwargs)
     return decorated
+
+
+class GitCheckout:
+    """
+    Git checkout.
+    """
+    def __init__(self, url: str, branch: str, directory: str, *, commit: str=None):
+        self.url = url
+        self.branch = branch
+        self.directory = directory
+        self.commit = commit
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, type(self)) \
+               and other.url == self.url \
+               and other.branch == self.branch \
+               and other.commit == self.commit \
+               and other.directory == self.directory
 
 
 class GitRepository:
@@ -73,19 +91,16 @@ class GitRepository:
         return self.checkout_location
 
     @requires_checkout
-    def push_changes(self, commit_message: str=None, changed_files: List[str]=None):
+    def push(self):
         """
         Commits then pushes changes to the repository.
-        :param commit_message: see `commit_changes`
-        :param changed_files: see `commit_changes`
         """
-        self.commit_changes(commit_message, changed_files)
         repository = Repo(self.checkout_location)
         repository.git.update_environment(GIT_SSH_COMMAND=self._get_ssh_command())
         repository.remotes.origin.push()
 
     @requires_checkout
-    def commit_changes(self, commit_message: str, changed_files: List[str]=None):
+    def commit(self, commit_message: str, changed_files: List[str]=None):
         """
         Commits changes to the repository.
         :param commit_message: the message to associate to the commit

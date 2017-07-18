@@ -1,35 +1,34 @@
-from typing import List, Any, Set, Dict
+from abc import ABCMeta
+from typing import List, Dict
+
+from gitcommonsync._git import GitCheckout
 
 
-class GitCheckout:
+class Synchronisation(metaclass=ABCMeta):
     """
-    Git checkout.
+    TOOD
     """
-    def __init__(self, url: str, branch: str, directory: str, *, commit: str=None):
-        self.url = url
-        self.branch = branch
-        self.directory = directory
-        self.commit = commit
-
-    def __eq__(self, other: Any) -> bool:
-        return isinstance(other, type(self)) \
-               and other.url == self.url \
-               and other.branch == self.branch \
-               and other.commit == self.commit \
-               and other.directory == self.directory
 
 
-class SubrepoSyncConfiguration:
+class SubrepoSynchronisation(Synchronisation):
     """
     Sub-repo synchronisation configuration.
     """
-    def __init__(self, checkout: GitCheckout=None, overwrite: bool=False):
+    @property
+    def destination(self) -> str:
+        """
+        TODO
+        :return:
+        """
+        return self.checkout.directory
+
+    def __init__(self, checkout: GitCheckout =None, overwrite: bool=False):
         self.checkout = checkout
         self.overwrite = overwrite
 
 
-# TODO: Extract shared superclass for this and `TemplateSyncConfiguration`
-class FileSyncConfiguration:
+# TODO: Extract shared superclass for this and `TemplateSynchronisation`
+class FileSynchronisation(Synchronisation):
     """
     File synchronisation configuration.
     """
@@ -39,7 +38,7 @@ class FileSyncConfiguration:
         self.overwrite = overwrite
 
 
-class TemplateSyncConfiguration(FileSyncConfiguration):
+class TemplateSynchronisation(FileSynchronisation):
     """
     Template synchronisation configuration.
     """
@@ -47,21 +46,21 @@ class TemplateSyncConfiguration(FileSyncConfiguration):
         super().__init__(source, destination, overwrite=overwrite)
         self.variables = variables
 
-
-class SyncConfiguration:
-    """
-    All synchronisation configurations.
-    """
-    def __init__(self, files: List[FileSyncConfiguration]=None, subrepos: List[SubrepoSyncConfiguration]=None,
-                 templates: List[TemplateSyncConfiguration]=None):
-        self.files = files if files is not None else []
-        self.subrepos = subrepos if subrepos is not None else []
-        self.templates = templates if templates is not None else []
-
-    def get_number_of_synchronisations(self) -> int:
-        """
-        TODO
-        :return:
-        """
-        return len(self.files) + len(self.subrepos) + len(self.templates)
-
+#
+# class MultiSynchronisation(Synchronisation):
+#     """
+#     All synchronisation configurations.
+#     """
+#     def __init__(self, files: List[FileSynchronisation]=None, subrepos: List[SubrepoSynchronisation]=None,
+#                  templates: List[TemplateSynchronisation]=None):
+#         self.files = files if files is not None else []
+#         self.subrepos = subrepos if subrepos is not None else []
+#         self.templates = templates if templates is not None else []
+#
+#     def get_number_of_synchronisations(self) -> int:
+#         """
+#         TODO
+#         :return:
+#         """
+#         return len(self.files) + len(self.subrepos) + len(self.templates)
+#
