@@ -23,6 +23,14 @@ class SubrepoSyncConfiguration:
     """
     Sub-repo synchronisation configuration.
     """
+    @property
+    def destination(self) -> str:
+        """
+        TODO
+        :return:
+        """
+        return self.checkout.directory
+
     def __init__(self, checkout: GitCheckout=None, overwrite: bool=False):
         self.checkout = checkout
         self.overwrite = overwrite

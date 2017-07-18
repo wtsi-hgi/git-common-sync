@@ -25,6 +25,9 @@ EXAMPLES = """
 
 try:
     from gitcommonsync.synchronise import synchronise, Synchronised
+    from gitcommonsync._repository import GitRepository
+    from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguration, SubrepoSyncConfiguration, \
+        GitCheckout, SyncConfiguration
     _HAS_DEPENDENCIES = True
 except ImportError as e:
     _HAS_DEPENDENCIES = False
@@ -34,10 +37,6 @@ import traceback
 from typing import Any, Dict, Tuple
 
 from ansible.module_utils.basic import AnsibleModule
-
-from gitcommonsync._repository import GitRepository
-from gitcommonsync.models import TemplateSyncConfiguration, FileSyncConfiguration, SubrepoSyncConfiguration, \
-    GitCheckout, SyncConfiguration
 
 
 _REPOSITORY_URL_PROPERTY = "repository"

@@ -73,19 +73,16 @@ class GitRepository:
         return self.checkout_location
 
     @requires_checkout
-    def push_changes(self, commit_message: str=None, changed_files: List[str]=None):
+    def push(self):
         """
         Commits then pushes changes to the repository.
-        :param commit_message: see `commit_changes`
-        :param changed_files: see `commit_changes`
         """
-        self.commit_changes(commit_message, changed_files)
         repository = Repo(self.checkout_location)
         repository.git.update_environment(GIT_SSH_COMMAND=self._get_ssh_command())
         repository.remotes.origin.push()
 
     @requires_checkout
-    def commit_changes(self, commit_message: str, changed_files: List[str]=None):
+    def commit(self, commit_message: str, changed_files: List[str]=None):
         """
         Commits changes to the repository.
         :param commit_message: the message to associate to the commit
