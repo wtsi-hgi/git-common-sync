@@ -1,10 +1,9 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Tuple, Dict, Any
-import stat
+from typing import List, Callable, Tuple, Any
 
-from git import Repo, GitCommandError, IndexFile, Actor, Git
+from git import Repo, GitCommandError, IndexFile, Actor
 
 DEFAULT_BRANCH = "master"
 SSH_COMMAND = "ssh"

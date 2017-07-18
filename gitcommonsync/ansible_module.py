@@ -2,7 +2,7 @@ from gitcommonsync.helpers import synchronise
 
 EXAMPLES = """
 - gitcommonsync:
-    repository: http://www.example.com/repository.git
+    repository: git@gitlab.example.com:user/repository.git
     committer_name: Ansible Synchroniser
     committer_email: team@example.com
     key_file: /custom/id_rsa

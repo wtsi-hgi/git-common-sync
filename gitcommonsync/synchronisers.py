@@ -143,7 +143,8 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
     def synchronise(self, synchronisables: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
         synchronised = super().synchronise(synchronisables, dry_run=dry_run)
         if self.aggregate_commits:
-            self.repository.commit(f"Synchronised {len(synchronised)} files.")
+            self.repository.commit(f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'} "
+                                   f"with {type(self).__name__} synchroniser.")
             self.repository.push()
         return synchronised
 
