@@ -136,6 +136,17 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
         is a human readable string detailing the reason for the choice to synchronise or not
         """
 
+    def __init__(self, repository: GitRepository, aggregate_commits: bool=True):
+        super().__init__(repository)
+        self.aggregate_commits = aggregate_commits
+
+    def synchronise(self, synchronisables: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
+        synchronised = super().synchronise(synchronisables, dry_run=dry_run)
+        if self.aggregate_commits:
+            self.repository.commit(f"Synchronised {len(synchronised)} files.")
+            self.repository.push()
+        return synchronised
+
     def _prepare_for_synchronise(self, synchronisable: FileSynchronisation):
         if not os.path.exists(synchronisable.source):
             raise FileNotFoundError(synchronisable.source)
@@ -151,8 +162,8 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
             return False, f"{synchronisable.source} != {target} (overwrite={synchronisable.overwrite})"
 
         was_synchronised, reason = self._synchronise_file(synchronisable)
-        if was_synchronised:
-            self.repository.commit(f"Synchronised {synchronisable.source}.", )
+        if was_synchronised and not self.aggregate_commits:
+            self.repository.commit(f"Synchronised {synchronisable.source}.")
 
         return was_synchronised, reason
 
