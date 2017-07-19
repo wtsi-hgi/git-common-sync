@@ -30,14 +30,15 @@ def synchronise(repository: GitRepository, synchronisables: List[Synchronisable]
         synchroniser_type = synchronisable_to_synchroniser[type(synchronisation)]
         jobs[synchroniser_type].append(synchronisation)
 
-    try:
-        repository.checkout()
-        for synchroniser_type, synchronisables in jobs.items():
-            assert len(synchronisables) > 0
-            synchroniser = synchroniser_type(repository)
-            synchronisable_type = type(synchronisables[0])
-            synchronised[synchronisable_type] = synchroniser.synchronise(synchronisables, dry_run=dry_run)
-    finally:
-        repository.tear_down()
+    if len(synchronisables) > 0:
+        try:
+            repository.checkout()
+            for synchroniser_type, synchronisables in jobs.items():
+                assert len(synchronisables) > 0
+                synchroniser = synchroniser_type(repository)
+                synchronisable_type = type(synchronisables[0])
+                synchronised[synchronisable_type] = synchroniser.synchronise(synchronisables, dry_run=dry_run)
+        finally:
+            repository.tear_down()
 
     return synchronised
