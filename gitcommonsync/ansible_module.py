@@ -33,6 +33,7 @@ except ImportError as e:
     _HAS_DEPENDENCIES = False
     _IMPORT_ERROR = e
 
+import sys
 import traceback
 from typing import Any, Dict, Tuple, List, Type, DefaultDict
 
@@ -85,6 +86,9 @@ def fail_if_missing_dependencies(module: AnsibleModule):
     Fails if this module is missing a required dependency.
     :param module: the Ansible Module
     """
+    if sys.version_info < 3.6:
+        module.fail_json(msg="Python 3.6 or above is required (current version: %s)" % sys.version_info)
+
     if not _HAS_DEPENDENCIES:
         module.fail_json(msg="A required Python module is not installed: %s" % traceback.format_exception(
             type(_IMPORT_ERROR), _IMPORT_ERROR, _IMPORT_ERROR.__traceback__))
