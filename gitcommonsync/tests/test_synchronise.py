@@ -1,74 +1,29 @@
 import json
 import os
 import shutil
+import stat
 import unittest
 from abc import abstractmethod, ABCMeta
 from pathlib import Path
-from tempfile import mkdtemp, mkstemp
-from typing import Tuple, Type, Generic, TypeVar, Dict
-from zipfile import ZipFile
-import stat
+from typing import Generic, TypeVar, Dict
 
 import gitsubrepo
 from git import Repo
-from gitcommonsync._ansible_runner import ANSIBLE_TEMPLATE_MODULE_NAME, run_ansible
 from gitsubrepo.exceptions import NotAGitSubrepoException
 
-from gitcommonsync.repository import GitRepository, GitCheckout
+from gitcommonsync._ansible_runner import ANSIBLE_TEMPLATE_MODULE_NAME, run_ansible
 from gitcommonsync.models import FileSynchronisation, SubrepoSynchronisation, TemplateSynchronisation
+from gitcommonsync.repository import GitRepository, GitCheckout
 from gitcommonsync.synchronisers import Synchroniser, SubrepoSynchroniser, FileSynchroniser, TemplateSynchroniser
-from gitcommonsync.tests._common import get_md5, is_accessible
-from gitcommonsync.tests.resources.information import EXTERNAL_REPOSITORY_ARCHIVE, EXTERNAL_REPOSITORY_NAME, FILE_1, \
-    BRANCH, GIT_MASTER_BRANCH, GIT_MASTER_HEAD_COMMIT, GIT_MASTER_OLD_COMMIT, GIT_DEVELOP_BRANCH, DIRECTORY_1
-
-NEW_FILE_1 = "new-file.txt"
-NEW_DIRECTORY_1 = "new-directory"
-CONTENTS = "test contents"
-TEMPLATE_VARIABLES = {
-    "foo": "123",
-    "bar": "abc"
-}
-TEMPLATE = {parameter: "{{ %s }}" % parameter for parameter in TEMPLATE_VARIABLES.keys()}
-GITHUB_TEST_REPOSITORY = "https://github.com/colin-nolan/test-repository.git"
-
+from gitcommonsync.tests._common import get_md5, is_accessible, TestWithGitRepository, NEW_FILE_1, NEW_DIRECTORY_1, \
+    TEMPLATE_VARIABLES, TEMPLATE, GITHUB_TEST_REPOSITORY
+from gitcommonsync.tests.resources.information import FILE_1, \
+    MASTER_BRANCH, MASTER_HEAD_COMMIT, MASTER_OLD_COMMIT, DEVELOP_BRANCH, DIRECTORY_1
 
 SynchroniserType = TypeVar("SynchroniserType", bound=Synchroniser)
 
 
-class _TestWithGitRepository(unittest.TestCase, metaclass=ABCMeta):
-    """
-    Base class for tests involving a Git repository.
-    """
-    def setUp(self):
-        self.temp_directory = mkdtemp()
-
-        with ZipFile(EXTERNAL_REPOSITORY_ARCHIVE) as archive:
-            archive.extractall(path=self.temp_directory)
-        self.external_git_repository_location = os.path.join(self.temp_directory, EXTERNAL_REPOSITORY_NAME)
-        self.external_git_repository = Repo(self.external_git_repository_location)
-
-        self.git_repository = GitRepository(self.external_git_repository_location, BRANCH)
-        self.git_directory = self.git_repository.checkout(parent_directory=self.temp_directory)
-        self.external_git_repository_md5 = get_md5(self.git_directory)
-
-    def tearDown(self):
-        shutil.rmtree(self.temp_directory)
-
-    def create_test_file(self, contents=CONTENTS, directory: str=None) -> Tuple[str, str]:
-        directory = directory if directory is not None else self.temp_directory
-        _, location = mkstemp(dir=directory)
-        with open(location, "w") as file:
-            file.write(contents)
-        return location, get_md5(location)
-
-    def create_test_directory(self, contains_n_files: int=3) -> Tuple[str, str]:
-        location = mkdtemp(dir=self.temp_directory)
-        for _ in range(contains_n_files):
-            self.create_test_file(directory=location)
-        return location, get_md5(location)
-
-
-class _TestSynchroniser(Generic[SynchroniserType], _TestWithGitRepository, metaclass=ABCMeta):
+class _TestSynchroniser(Generic[SynchroniserType], TestWithGitRepository, metaclass=ABCMeta):
     """
     Base class for tests for `Synchroniser`.
     """
@@ -93,7 +48,7 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
 
     def setUp(self):
         super().setUp()
-        self.git_checkout = GitCheckout(self.external_git_repository_location, GIT_MASTER_BRANCH, NEW_DIRECTORY_1)
+        self.git_checkout = GitCheckout(self.external_git_repository_location, MASTER_BRANCH, NEW_DIRECTORY_1)
         self.git_subrepo_directory = os.path.join(self.git_directory, self.git_checkout.directory)
 
     def test_sync_onto_existing_non_subrepo_directory(self):
@@ -107,7 +62,7 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         self.assertRaises(ValueError, self.synchroniser.synchronise, synchronisations)
 
     def test_sync_new_subrepo(self):
-        self.git_checkout.commit = GIT_MASTER_HEAD_COMMIT
+        self.git_checkout.commit = MASTER_HEAD_COMMIT
         synchronisations = [SubrepoSynchronisation(self.git_checkout)]
         synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual(synchronisations, synchronised)
@@ -130,17 +85,17 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
 
     def test_sync_out_of_date_subrepo_no_override(self):
         gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=self.git_checkout.branch,
-              commit=GIT_MASTER_OLD_COMMIT)
+                         commit=MASTER_OLD_COMMIT)
         synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=False)]
         synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual([], synchronised)
-        self.assertEqual(GIT_MASTER_OLD_COMMIT[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
+        self.assertEqual(MASTER_OLD_COMMIT[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
     def test_sync_out_of_date_subrepo_with_override(self):
-        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_MASTER_BRANCH)
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=MASTER_BRANCH)
         self.git_repository.push()
 
-        updated_repository = GitRepository(self.external_git_repository_location, GIT_MASTER_BRANCH)
+        updated_repository = GitRepository(self.external_git_repository_location, MASTER_BRANCH)
         updated_repository_location = updated_repository.checkout(parent_directory=self.create_test_directory()[0])
         Path(os.path.join(updated_repository_location, NEW_FILE_1)).touch()
         updated_repository.commit("Updated", [os.path.join(updated_repository_location, NEW_FILE_1)])
@@ -153,8 +108,8 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         self.assertTrue(os.path.exists(os.path.join(self.git_subrepo_directory, NEW_FILE_1)))
 
     def test_sync_out_of_date_subrepo_to_intermediate_commit(self):
-        self.git_checkout.commit = GIT_MASTER_HEAD_COMMIT
-        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_MASTER_BRANCH)
+        self.git_checkout.commit = MASTER_HEAD_COMMIT
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=MASTER_BRANCH)
         # Push the clone commit
         self.git_repository.push()
         synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
@@ -163,13 +118,13 @@ class TestSubrepoSynchroniser(_TestSynchroniser[SubrepoSynchroniser]):
         self.assertEqual(self.git_checkout.commit[0:7], gitsubrepo.status(self.git_subrepo_directory)[2])
 
     def test_sync_subrepo_to_different_branch(self):
-        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=GIT_DEVELOP_BRANCH)
+        gitsubrepo.clone(self.git_checkout.url, self.git_subrepo_directory, branch=DEVELOP_BRANCH)
         synchronisations = [SubrepoSynchronisation(self.git_checkout, overwrite=True)]
         synchronised = self.synchroniser.synchronise(synchronisations)
         self.assertEqual(synchronisations, synchronised)
         url, branch, commit = gitsubrepo.status(self.git_subrepo_directory)
-        self.assertEqual(GIT_MASTER_HEAD_COMMIT[0:7], commit)
-        self.assertEqual(GIT_MASTER_BRANCH, branch)
+        self.assertEqual(MASTER_HEAD_COMMIT[0:7], commit)
+        self.assertEqual(MASTER_BRANCH, branch)
 
 
 class _TestFileBasedSynchroniser(Generic[SynchroniserType], _TestSynchroniser[SynchroniserType], metaclass=ABCMeta):
@@ -347,4 +302,4 @@ class TestTemplateSynchroniser(_TestFileBasedSynchroniser[TemplateSynchroniser])
         )
 
 
-del _TestSynchroniser, _TestWithGitRepository, _TestFileBasedSynchroniser
+del _TestSynchroniser, TestWithGitRepository, _TestFileBasedSynchroniser

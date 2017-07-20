@@ -47,7 +47,7 @@ class GitRepository:
     _REQUIRED_USER_CONFIG_PARAMETERS = ["user.name", "user.email"]
 
     def __init__(self, remote: str, branch: str, *, checkout_location: str=None,
-                 committer_name_and_email: Tuple[str, str]=None, private_key_file: str=None):
+                 committer_name_and_email: Tuple[str, str]=None, private_key_file: str=None, create_branch: bool=True):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
@@ -58,6 +58,7 @@ class GitRepository:
         second is the author's email address. If not defined, it will be attempted to get the author from the global
         configuration
         :param private_key_file: the private key to use when cloning the repository
+        :param create_branch: whether the branch should be created if it does not exist
         """
         self.remote = remote
         self.branch = branch
@@ -65,6 +66,7 @@ class GitRepository:
         self.committer_name = committer_name_and_email[0] if committer_name_and_email is not None else None
         self.committer_email = committer_name_and_email[1] if committer_name_and_email is not None else None
         self.private_key_file = private_key_file
+        self.create_branch = create_branch
 
     def tear_down(self):
         """
@@ -72,6 +74,7 @@ class GitRepository:
         """
         if os.path.exists(self.checkout_location):
             shutil.rmtree(self.checkout_location)
+            self.checkout_location = None
 
     def checkout(self, parent_directory: str=None) -> str:
         """
@@ -87,7 +90,13 @@ class GitRepository:
         repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location,
                                      env={"GIT_SSH_COMMAND": self._get_ssh_command()})
 
-        repository.heads[self.branch].checkout()
+        if self.branch not in repository.heads and self.create_branch:
+            # It doesn't appear that `create_head` can be used to create branches without basing them off a commit (i.e.
+            # if it is a new repository)
+            repository.git.checkout(self.branch, b=True)
+        else:
+            repository.heads[self.branch].checkout()
+
         return self.checkout_location
 
     @requires_checkout
@@ -97,7 +106,7 @@ class GitRepository:
         """
         repository = Repo(self.checkout_location)
         repository.git.update_environment(GIT_SSH_COMMAND=self._get_ssh_command())
-        repository.remotes.origin.push()
+        repository.remotes.origin.push(refspec=f"{self.branch}:{self.branch}")
 
     @requires_checkout
     def commit(self, commit_message: str, changed_files: List[str]=None):
@@ -120,7 +129,7 @@ class GitRepository:
             else:
                 repository.git.add(A=True)
 
-            if len(repository.index.diff(repository.head.commit)) > 0:
+            if len(repository.refs) == 0 or len(repository.index.diff(repository.head.commit)) > 0:
                 self._commit(index, commit_message)
 
     def _commit(self, index: IndexFile, commit_message: str):
