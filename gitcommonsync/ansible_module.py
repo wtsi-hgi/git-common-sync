@@ -87,7 +87,7 @@ def fail_if_missing_dependencies(module: AnsibleModule):
     Fails if this module is missing a required dependency.
     :param module: the Ansible Module
     """
-    if sys.version_info < 3.6:
+    if sys.version_info < (3, 6):
         module.fail_json(msg="Python 3.6 or above is required (current version: %s)" % sys.version_info)
 
     if not _HAS_DEPENDENCIES:
