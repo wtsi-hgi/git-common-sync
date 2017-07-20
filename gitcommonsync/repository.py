@@ -52,7 +52,8 @@ class GitRepository:
         Constructor.
         :param remote: url of the remote which this repository tracks
         :param branch: the branch on the remote that is to be checked out
-        :param checkout_location: optional location in which the repository has already being checked out
+        :param checkout_location: optional location in which the repository has already being checked out. Becomes the
+        responsibility of this object and hence is removed on tear down
         :param committer_name_and_email: the commit author to use, where the first element is the author's name and the
         second is the author's email address. If not defined, it will be attempted to get the author from the global
         configuration
@@ -69,7 +70,7 @@ class GitRepository:
         """
         Tears down any repository files on the local machine.
         """
-        if self.checkout_location:
+        if os.path.exists(self.checkout_location):
             shutil.rmtree(self.checkout_location)
 
     def checkout(self, parent_directory: str=None) -> str:
