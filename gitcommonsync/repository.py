@@ -47,24 +47,23 @@ class GitRepository:
     _REQUIRED_USER_CONFIG_PARAMETERS = ["user.name", "user.email"]
 
     def __init__(self, remote: str, branch: str, *, checkout_location: str=None,
-                 committer_name_and_email: Tuple[str, str]=None, private_key_file: str=None, create_branch: bool=True):
+                 author_name: str=None, author_email: str=None, private_key_file: str=None, create_branch: bool=True):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
         :param branch: the branch on the remote that is to be checked out
         :param checkout_location: optional location in which the repository has already being checked out. Becomes the
         responsibility of this object and hence is removed on tear down
-        :param committer_name_and_email: the commit author to use, where the first element is the author's name and the
-        second is the author's email address. If not defined, it will be attempted to get the author from the global
-        configuration
+        :param author_name: the commit author's name (defaults to system defined)
+        :param author_email: the commit author's email address (defaults to system defined)
         :param private_key_file: the private key to use when cloning the repository
         :param create_branch: whether the branch should be created if it does not exist
         """
         self.remote = remote
         self.branch = branch
         self.checkout_location = checkout_location
-        self.committer_name = committer_name_and_email[0] if committer_name_and_email is not None else None
-        self.committer_email = committer_name_and_email[1] if committer_name_and_email is not None else None
+        self.author_name = author_name if author_name is not None else None
+        self.author_email = author_email if author_email is not None else None
         self.private_key_file = private_key_file
         self.create_branch = create_branch
 
@@ -138,8 +137,8 @@ class GitRepository:
         :param index: the repository index with changes to commit
         :param commit_message: the message to associate with the commit
         """
-        if self.committer_name is not None and self.committer_email is not None:
-            author = Actor(self.committer_name, self.committer_email)
+        if self.author_name is not None and self.author_email is not None:
+            author = Actor(self.author_name, self.author_email)
         else:
             for config in GitRepository._REQUIRED_USER_CONFIG_PARAMETERS:
                 try:

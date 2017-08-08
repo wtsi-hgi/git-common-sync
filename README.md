@@ -29,8 +29,8 @@ _A tool to synchronise common files between Git repositories._
 ```yaml
 - gitcommonsync:
     repository: http://www.example.com/repository.git
-    committer_name: Ansible Synchroniser
-    committer_email: team@example.com
+    author_name: Ansible Synchroniser
+    author_email: team@example.com
     key_file: /custom/id_rsa
     files:
       - src: /example/README.md

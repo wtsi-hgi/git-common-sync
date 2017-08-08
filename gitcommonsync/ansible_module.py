@@ -2,8 +2,8 @@
 EXAMPLES = """
 - gitcommonsync:
     repository: git@gitlab.example.com:user/repository.git
-    committer_name: Ansible Synchroniser
-    committer_email: team@example.com
+    author_name: Ansible Synchroniser
+    author_email: team@example.com
     key_file: /custom/id_rsa
     files:
       - src: /example/README.md
@@ -43,8 +43,8 @@ from ansible.module_utils.basic import AnsibleModule
 
 REPOSITORY_URL_PROPERTY = "repository"
 REPOSITORY_BRANCH_PROPERTY = "branch"
-REPOSITORY_COMMITTER_NAME_PROPERTY = "committer_name"
-REPOSITORY_COMMITTER_EMAIL_PROPERTY = "committer_email"
+REPOSITORY_AUTHOR_NAME_PROPERTY = "author_name"
+REPOSITORY_AUTHOR_EMAIL_PROPERTY = "author_email"
 REPOSITORY_KEY_FILE_PROPERTY = "key_file"
 
 TEMPLATES_PROPERTY = "templates"
@@ -73,8 +73,8 @@ CHANGED_SUBREPOS_RETURN_PROPERTY = "subrepos"
 _ARGUMENT_SPEC = {
     REPOSITORY_URL_PROPERTY: dict(required=True, type="str"),
     REPOSITORY_BRANCH_PROPERTY: dict(required=False, default="master", type="str"),
-    REPOSITORY_COMMITTER_NAME_PROPERTY: dict(required=False, type="str"),
-    REPOSITORY_COMMITTER_EMAIL_PROPERTY: dict(required=False, type="str"),
+    REPOSITORY_AUTHOR_NAME_PROPERTY: dict(required=False, type="str"),
+    REPOSITORY_AUTHOR_EMAIL_PROPERTY: dict(required=False, type="str"),
     REPOSITORY_KEY_FILE_PROPERTY: dict(required=False, type="str"),
     TEMPLATES_PROPERTY: dict(required=False, default=[], type="list"),
     FILES_PROPERTY: dict(required=False, default=[], type="list"),
@@ -104,12 +104,12 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", Lis
     """
     repository_location = arguments[REPOSITORY_URL_PROPERTY]
     branch = arguments[REPOSITORY_BRANCH_PROPERTY]
-    committer_name = arguments[REPOSITORY_COMMITTER_NAME_PROPERTY]
-    committer_email = arguments[REPOSITORY_COMMITTER_EMAIL_PROPERTY]
+    author_name = arguments[REPOSITORY_AUTHOR_NAME_PROPERTY]
+    author_email = arguments[REPOSITORY_AUTHOR_EMAIL_PROPERTY]
     private_key_file = arguments[REPOSITORY_KEY_FILE_PROPERTY]
 
     repository = GitRepository(remote=repository_location, branch=branch, private_key_file=private_key_file,
-                               committer_name_and_email=(committer_name, committer_email))
+                               author_name=author_name, author_email=author_email)
 
     synchronisations: List[Synchronisable] = []
 
@@ -141,8 +141,7 @@ def parse_configuration(arguments: Dict[str, Any]) -> Tuple["GitRepository", Lis
                 commit=configuration[SUBREPO_COMMIT_PROPERTY] if SUBREPO_COMMIT_PROPERTY in configuration else None,
                 directory=configuration[SUBREPO_DIRECTORY_PROPERTY]
             ),
-            overwrite=configuration[SUBREPO_OVERWRITE_PROPERTY]
-            if SUBREPO_OVERWRITE_PROPERTY in configuration else False
+            overwrite=configuration[SUBREPO_OVERWRITE_PROPERTY] if SUBREPO_OVERWRITE_PROPERTY in configuration else False
         )
         for configuration in arguments[SUBREPOS_PROPERTY]
     ])

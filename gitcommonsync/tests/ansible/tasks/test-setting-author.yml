@@ -6,8 +6,8 @@
   - name: test synchronise new file
     gitcommonsync:
       repository: "{{ remote_directory }}"
-      committer_name: "{{ gitcommonsync_test_committer_name }}"
-      committer_email: "{{ gitcommonsync_test_committer_email }}"
+      author_name: "{{ gitcommonsync_test_author_name }}"
+      author_email: "{{ gitcommonsync_test_author_email }}"
       files:
         - src: "{{ example_files }}/a.txt"
           dest: a/new.txt
@@ -34,8 +34,8 @@
   - name: verify committer
     assert:
       that:
-        - set_author_name.stdout == gitcommonsync_test_committer_name
-        - set_author_email.stdout == gitcommonsync_test_committer_email
+        - set_author_name.stdout == gitcommonsync_test_author_name
+        - set_author_email.stdout == gitcommonsync_test_author_email
 
   always:
     - include: tear-down.yml

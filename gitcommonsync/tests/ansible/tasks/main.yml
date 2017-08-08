@@ -6,4 +6,4 @@
 
 - include: test-sync-subrepos.yml
 
-- include: test-setting-committer.yml
+- include: test-setting-author.yml
