@@ -1,5 +1,10 @@
 # Change Log
 
+## 2.0.0 - 2017-08-08
+### Changed
+- `commmitter_name` -> `author_name`; `commmitter_email` -> `author_email`.
+- Author name/email address is used when checking out subrepos.
+
 ## 1.2.0 - 2017-07-20
 ### Added
 - Support for working with newly created repositories, which have no commits.  
