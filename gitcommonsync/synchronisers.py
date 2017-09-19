@@ -118,7 +118,8 @@ class SubrepoSynchroniser(Synchroniser[SubrepoSynchronisation]):
 
         assert not os.path.exists(destination)
         new_commit = gitsubrepo.clone(
-            required_checkout.url, destination, branch=required_checkout.branch, commit=required_checkout.commit)
+            required_checkout.url, destination, branch=required_checkout.branch, commit=required_checkout.commit,
+            author_name=self.repository.author_name, author_email=self.repository.author_email)
         assert new_commit != required_checkout.commit
         return True, f"Checked out subrepo: {required_checkout} (forced updated={force_update})"
 
