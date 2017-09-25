@@ -47,7 +47,8 @@ class GitRepository:
     _REQUIRED_USER_CONFIG_PARAMETERS = ["user.name", "user.email"]
 
     def __init__(self, remote: str, branch: str, *, checkout_location: str=None,
-                 author_name: str=None, author_email: str=None, private_key_file: str=None, create_branch: bool=True):
+                 author_name: str=None, author_email: str=None, private_key_file: str=None, create_branch: bool=True,
+                 host_key_checking: bool=True):
         """
         Constructor.
         :param remote: url of the remote which this repository tracks
@@ -58,6 +59,7 @@ class GitRepository:
         :param author_email: the commit author's email address (defaults to system defined)
         :param private_key_file: the private key to use when cloning the repository
         :param create_branch: whether the branch should be created if it does not exist
+        :param host_key_checking: `False` for -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
         """
         self.remote = remote
         self.branch = branch
@@ -66,6 +68,7 @@ class GitRepository:
         self.author_email = author_email if author_email is not None else None
         self.private_key_file = private_key_file
         self.create_branch = create_branch
+        self.host_key_checking = host_key_checking
 
     def tear_down(self):
         """
@@ -153,4 +156,9 @@ class GitRepository:
         Gets the SSH command required to access the repository.
         :return: the SSH command
         """
-        return f"{SSH_COMMAND} -i {self.private_key_file}" if self.private_key_file is not None else SSH_COMMAND
+        arguments = [SSH_COMMAND]
+        if not self.host_key_checking:
+            arguments += ["-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"]
+        if self.private_key_file is not None:
+            arguments += ["-i", self.private_key_file]
+        return " ".join(arguments)
