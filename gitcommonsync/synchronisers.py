@@ -53,7 +53,7 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
                 synchronised.append(synchronisable)
 
         if len(synchronised) > 0 and not dry_run:
-            self.repository.push()
+            self._save(synchronised)
 
         return synchronised
 
@@ -73,6 +73,15 @@ class Synchroniser(Generic[Synchronisable], metaclass=ABCMeta):
         if not os.path.exists(intermediate_directories):
             _logger.info(f"Creating intermediate directories: {intermediate_directories}")
             os.makedirs(intermediate_directories)
+
+    def _save(self, synchronised: List[Synchronisable]):
+        """
+        Save the synchronisation to the upstream repository.
+
+        By default, this method will just push any committed changes upstream: it will not commit anything.
+        :return:
+        """
+        self.repository.push()
 
 
 class SubrepoSynchroniser(Synchroniser[SubrepoSynchronisation]):
@@ -137,18 +146,6 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
         is a human readable string detailing the reason for the choice to synchronise or not
         """
 
-    def __init__(self, repository: GitRepository, aggregate_commits: bool=True):
-        super().__init__(repository)
-        self.aggregate_commits = aggregate_commits
-
-    def synchronise(self, synchronisables: List[Synchronisable], dry_run: bool=False) -> List[Synchronisable]:
-        synchronised = super().synchronise(synchronisables, dry_run=dry_run)
-        if self.aggregate_commits:
-            self.repository.commit(f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'} "
-                                   f"with {type(self).__name__} synchroniser.")
-            self.repository.push()
-        return synchronised
-
     def _prepare_for_synchronise(self, synchronisable: FileSynchronisation):
         if not os.path.exists(synchronisable.source):
             raise FileNotFoundError(synchronisable.source)
@@ -163,11 +160,12 @@ class FileBasedSynchroniser(Generic[FileBasedSynchronisable], Synchroniser[FileB
         if os.path.exists(target) and not synchronisable.overwrite:
             return False, f"{synchronisable.source} != {target} (overwrite={synchronisable.overwrite})"
 
-        was_synchronised, reason = self._synchronise_file(synchronisable)
-        if was_synchronised and not self.aggregate_commits:
-            self.repository.commit(f"Synchronised {synchronisable.source}.")
+        return self._synchronise_file(synchronisable)
 
-        return was_synchronised, reason
+    def _save(self, synchronised: List[Synchronisable]):
+        self.repository.commit(f"Synchronised {len(synchronised)} file{'' if len(synchronised) == 1 else 's'} "
+                               f"with {type(self).__name__} synchroniser.")
+        self.repository.push()
 
 
 class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchroniser[Synchronisable], metaclass=ABCMeta):
