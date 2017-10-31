@@ -1,7 +1,8 @@
 import os
 import shutil
 from tempfile import mkdtemp
-from typing import List, Callable, Tuple, Any
+
+from typing import List, Callable, Any
 
 from git import Repo, GitCommandError, IndexFile, Actor
 
@@ -74,7 +75,7 @@ class GitRepository:
         """
         Tears down any repository files on the local machine.
         """
-        if os.path.exists(self.checkout_location):
+        if self.checkout_location is not None and os.path.exists(self.checkout_location):
             shutil.rmtree(self.checkout_location)
             self.checkout_location = None
 
@@ -88,9 +89,15 @@ class GitRepository:
         if self.checkout_location is not None:
             raise IsADirectoryError(f"Repository already checked out in {self.checkout_location}")
 
-        self.checkout_location = mkdtemp(dir=parent_directory)
-        repository = Repo.clone_from(url=self.remote, to_path=self.checkout_location,
-                                     env={"GIT_SSH_COMMAND": self._get_ssh_command()})
+        checkout_location = mkdtemp(dir=parent_directory)
+        try:
+            repository = Repo.clone_from(
+                url=self.remote, to_path=checkout_location, env={"GIT_SSH_COMMAND": self._get_ssh_command()})
+        except Exception as e:
+            if os.path.exists(checkout_location):
+                os.removedirs(checkout_location)
+            raise e
+        self.checkout_location = checkout_location
 
         if self.branch not in repository.heads and self.create_branch:
             # It doesn't appear that `create_head` can be used to create branches without basing them off a commit (i.e.

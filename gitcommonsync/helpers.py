@@ -22,6 +22,9 @@ def synchronise(repository: GitRepository, synchronisables: List[Synchronisable]
     :param dry_run: does not push changes back if set to True
     :return: the synchronisations applied, indexed by synchronisation type
     """
+    if repository.checkout_location is not None:
+        raise ValueError("Repository must not already be checked out")
+
     jobs: Dict[Type[Synchroniser], List[Synchronisable]] = defaultdict(list)
     synchronised: Dict[Type[Synchronisable], List[Synchronisable]] = defaultdict(list)
 
