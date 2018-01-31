@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 EXAMPLES = """
 - gitcommonsync:
     repository: git@gitlab.example.com:user/repository.git

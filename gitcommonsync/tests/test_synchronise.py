@@ -296,8 +296,8 @@ class TestTemplateSynchroniser(_TestFileBasedSynchroniser[TemplateSynchroniser])
         :param template_variables: variables to populate the template with
         """
         run_ansible(
-            tasks=[dict(action=dict(module=ANSIBLE_TEMPLATE_MODULE_NAME,
-                                    args=dict(src=self.template_source, dest=self.template_destination)))],
+            ANSIBLE_TEMPLATE_MODULE_NAME,
+            dict(src=self.template_source, dest=self.template_destination),
             variables=template_variables
         )
 

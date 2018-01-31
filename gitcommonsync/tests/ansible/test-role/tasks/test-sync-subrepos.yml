@@ -1,7 +1,7 @@
 ---
 
 - block:
-  - include: setup.yml
+  - import_tasks: setup.yml
 
   - name: test create new subrepo
     gitcommonsync:
@@ -70,4 +70,4 @@
         - test_results | json_query("values(synchronised)[]") | length == 0
 
   always:
-    - include: tear-down.yml
+    - import_tasks: tear-down.yml

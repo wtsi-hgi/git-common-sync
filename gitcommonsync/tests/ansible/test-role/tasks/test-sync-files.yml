@@ -1,7 +1,7 @@
 ---
 
 - block:
-  - include: setup.yml
+  - import_tasks: setup.yml
 
   - name: test synchronise new file
     gitcommonsync:
@@ -82,4 +82,4 @@
         - (test_results.synchronised.subrepos + test_results.synchronised.templates) | length == 0
 
   always:
-    - include: tear-down.yml
+    - import_tasks: tear-down.yml

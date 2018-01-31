@@ -1,0 +1,9 @@
+---
+
+- import_tasks: test-sync-files.yml
+
+- import_tasks: test-sync-templates.yml
+
+- import_tasks: test-sync-subrepos.yml
+
+- import_tasks: test-setting-author.yml

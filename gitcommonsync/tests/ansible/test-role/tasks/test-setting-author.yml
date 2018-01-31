@@ -1,7 +1,7 @@
 ---
 
 - block:
-  - include: setup.yml
+  - import_tasks: setup.yml
 
   - name: test synchronise new file
     gitcommonsync:
@@ -38,10 +38,10 @@
         - set_author_email.stdout == gitcommonsync_test_author_email
 
   always:
-    - include: tear-down.yml
+    - import_tasks: tear-down.yml
 
 - block:
-  - include: setup.yml
+  - import_tasks: setup.yml
 
   - name: test synchronise subrepo
     gitcommonsync:
@@ -78,4 +78,4 @@
         - set_author_name.stdout == gitcommonsync_test_author_name
         - set_author_email.stdout == gitcommonsync_test_author_email
   always:
-    - include: tear-down.yml
+    - import_tasks: tear-down.yml

@@ -1,106 +1,111 @@
-from typing import Dict, List
+import json
+import os
+import re
+import subprocess
 
-from ansible.executor.task_queue_manager import TaskQueueManager
-from ansible.executor.task_result import TaskResult
-from ansible.inventory import Inventory
-from ansible.parsing.dataloader import DataLoader
-from ansible.playbook.play import Play
+# from ansible.inventory import Inventory
 from ansible.plugins.callback import CallbackBase
-from ansible.vars import VariableManager
+from typing import Dict, List, Optional
+
+# from ansible.vars import VariableManager
 
 ANSIBLE_TEMPLATE_MODULE_NAME = "template"
 ANSIBLE_RSYNC_MODULE_NAME = "synchronize"
+
+_ANSIBLE_BINARY = "ansible"
+_ANSIBLE_MODULE_FLAG = "-m"
+_ANSIBLE_MODULE_ARGUMENTS_FLAG = "-a"
+_ANSILBE_INVENTORY_FLAG = "-i"
+_ANSILBE_VARIABLE_FLAG = "-e"
+_ANSILBE_CONNECTION_FLAG = "-c"
+_ANSIBLE_LOCAL_INVENTORY = "localhost"
+_ANSIBLE_LOCAL_CONNECTION = "local"
+_ANSIBLE_OUTPUT_ENCODING = "utf-8"
+_ANSIBLE_HOST = "localhost"
+_ANSIBLE_STDOUT_CALLBACK_ENV_PARAMETER = "ANSIBLE_STDOUT_CALLBACK"
+_ANSIBLE_STDOUT_CALLBACK_ONELINE = "oneline"
+_ANSIBLE_STDOUT_CALLBACK_JSON_LOG_EXTRACT_PATTERN = re.compile(r".*=> ")
+_ANSIBLE_LOAD_CALLBACK_PLUGINS_ENV_PARAMETER = "ANSIBLE_LOAD_CALLBACK_PLUGINS"
+_ANSIBLE_LOAD_CALLBACK_PLUGINS_ENABLED = "1"
 
 
 class AnsibleRuntimeException(RuntimeError):
     """
     Exception raised if Ansible encounters a problem at runtime.
     """
+    def __init__(self, output: str, error: str):
+        super().__init__(f"Error: {error}; Output: {output}")
+        self.output = output
+        self.error = error
 
 
-class ResultCallbackHandler(CallbackBase):
+class AnsibleResult:
     """
-    Ansible playbook callback handler.
+    TODO
     """
-    def __init__(self):
+    @property
+    def changed(self) -> bool:
+        """
+        TODO
+        :return:
+        """
+        return self._log["changed"] == True
+
+    @property
+    def command(self) -> str:
+        return self._log["cmd"]
+    
+    @property
+    def stdout_lines(self) -> List[str]:
+        return self._log["stdout_lines"]
+
+    def __init__(self, log: Dict):
+        """
+        TODO
+        :param log:
+        """
         super().__init__()
-        self.results = []
-
-    def v2_runner_on_ok(self, result, **kwargs):
-        self.results.append(result)
-
-    def v2_runner_on_failed(self, result, ignore_errors=False):
-        self.results.append(result)
+        self._log = log
 
 
-class PlaybookOptions:
+
+def run_ansible(ansible_module: str, ansible_module_arguments: Dict=None, variables: Dict=None,
+                ansible_binary: str=_ANSIBLE_BINARY):
     """
-    Ansible playbook options.
+    TODO
+    :param ansible_module:
+    :param ansible_module_arguments:
+    :param variables:
+    :param ansible_binary:
+    :return:
     """
-    def __init__(self, *, connection: str="local", module_path: str=None, forks: int=100, become: bool=False,
-                 become_method: str=None, become_user: str=None, check: bool=False):
-        self.connection = connection
-        self.module_path = module_path
-        self.forks = forks
-        self.become = become
-        self.become_method = become_method
-        self.become_user = become_user
-        self.check = check
+    environment: Dict[str, str] = dict(PATH=os.environ["PATH"])
+    environment[_ANSIBLE_STDOUT_CALLBACK_ENV_PARAMETER] = _ANSIBLE_STDOUT_CALLBACK_ONELINE
+    environment[_ANSIBLE_LOAD_CALLBACK_PLUGINS_ENV_PARAMETER] = _ANSIBLE_LOAD_CALLBACK_PLUGINS_ENABLED
 
+    extra_arguments = []
 
-def run_ansible(tasks: List[Dict]=None, roles: List[str]=None, variables: Dict[str, str]=None,
-                playbook_options: PlaybookOptions=None, results_callback_handler: ResultCallbackHandler=None) \
-        -> List[TaskResult]:
-    """
-    Run the given Ansible tasks or roles with the given options.
-    :param tasks: the tasks to run, represented in a list, containing dictionaries. e.g.
-    ```
-    dict(action=dict(module="file", args=dict(path="/testing", state="directory"), register="testing_created")
-    ```
-    :param roles: the names of the roles to run
-    :param variables: Ansible variables (key-value pairs)
-    :param playbook_options: options to use when running Ansible playbook
-    :param results_callback_handler: handler for callbacks
-    :return: the results of running Ansible
-    """
-    if variables is None:
-        variables = {}
-    if playbook_options is None:
-        playbook_options = PlaybookOptions()
+    if ansible_module_arguments is not None and len(ansible_module_arguments) > 0:
+        module_arguments = " ".join([f"{key}={value}" for key, value in ansible_module_arguments.items()])
+        extra_arguments += [_ANSIBLE_MODULE_ARGUMENTS_FLAG, module_arguments]
 
-    variable_manager = VariableManager()
-    variable_manager.extra_vars = variables
-    loader = DataLoader()
-    if results_callback_handler is None:
-        results_callback_handler = ResultCallbackHandler()
+    if variables is not None:
+        extra_arguments += [_ANSILBE_VARIABLE_FLAG, json.dumps(variables)]
 
-    inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=None)
-    variable_manager.set_inventory(inventory)
+    # TODO: Don't gather facts
+    process_arguments = [ansible_binary, _ANSIBLE_MODULE_FLAG, ansible_module, _ANSILBE_INVENTORY_FLAG,
+                         f"{_ANSIBLE_LOCAL_INVENTORY},", _ANSILBE_CONNECTION_FLAG, _ANSIBLE_LOCAL_CONNECTION] \
+                         + extra_arguments + [_ANSIBLE_HOST]
 
-    play_source = dict(
-        hosts="localhost",
-        gather_facts="no",
-    )
-    if tasks is not None:
-        play_source["tasks"] = tasks
-    if roles is not None:
-        play_source["roles"] = roles
+    process = subprocess.Popen(process_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
+    output, error = process.communicate()
 
-    play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
+    # TODO: set `encoding` on Popen instead
+    decoded_output = output.decode(_ANSIBLE_OUTPUT_ENCODING).strip()
+    decoded_error = error.decode(_ANSIBLE_OUTPUT_ENCODING).strip()
 
-    task_queue_manager = None
-    try:
-        task_queue_manager = TaskQueueManager(
-            inventory=inventory,
-            variable_manager=variable_manager,
-            loader=loader,
-            options=playbook_options,
-            passwords=dict(),
-            stdout_callback=results_callback_handler
-        )
-        task_queue_manager.run(play)
-    finally:
-        if task_queue_manager is not None:
-            task_queue_manager.cleanup()
+    if process.returncode != 0:
+        raise AnsibleRuntimeException(decoded_output, decoded_error)
 
-    return results_callback_handler.results
+    output_json = json.loads(_ANSIBLE_STDOUT_CALLBACK_JSON_LOG_EXTRACT_PATTERN.sub("", output.decode("utf-8")))
+    return AnsibleResult(output_json)
