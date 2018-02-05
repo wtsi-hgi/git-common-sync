@@ -1,22 +1,23 @@
 import json
 import os
-import re
 import subprocess
+import sys
 
+import re
+import shutil
 # from ansible.inventory import Inventory
-from ansible.plugins.callback import CallbackBase
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # from ansible.vars import VariableManager
 
 ANSIBLE_TEMPLATE_MODULE_NAME = "template"
 ANSIBLE_RSYNC_MODULE_NAME = "synchronize"
 
-_ANSIBLE_BINARY = "ansible"
+_ANSIBLE_LOCATION = shutil.which("ansible")
 _ANSIBLE_MODULE_FLAG = "-m"
 _ANSIBLE_MODULE_ARGUMENTS_FLAG = "-a"
 _ANSILBE_INVENTORY_FLAG = "-i"
-_ANSILBE_VARIABLE_FLAG = "-e"
+_ANSIBLE_VARIABLE_FLAG = "-e"
 _ANSILBE_CONNECTION_FLAG = "-c"
 _ANSIBLE_LOCAL_INVENTORY = "localhost"
 _ANSIBLE_LOCAL_CONNECTION = "local"
@@ -70,16 +71,17 @@ class AnsibleResult:
 
 
 def run_ansible(ansible_module: str, ansible_module_arguments: Dict=None, variables: Dict=None,
-                ansible_binary: str=_ANSIBLE_BINARY):
+                ansible_location: str=_ANSIBLE_LOCATION):
     """
     TODO
     :param ansible_module:
     :param ansible_module_arguments:
     :param variables:
-    :param ansible_binary:
+    :param ansible_location:
     :return:
     """
-    environment: Dict[str, str] = dict(PATH=os.environ["PATH"])
+    # HOME is required for https://github.com/ansible/ansible/issues/31617
+    environment: Dict[str, str] = {variable: os.environ[variable] for variable in ("HOME", "PATH")}
     environment[_ANSIBLE_STDOUT_CALLBACK_ENV_PARAMETER] = _ANSIBLE_STDOUT_CALLBACK_ONELINE
     environment[_ANSIBLE_LOAD_CALLBACK_PLUGINS_ENV_PARAMETER] = _ANSIBLE_LOAD_CALLBACK_PLUGINS_ENABLED
 
@@ -90,22 +92,19 @@ def run_ansible(ansible_module: str, ansible_module_arguments: Dict=None, variab
         extra_arguments += [_ANSIBLE_MODULE_ARGUMENTS_FLAG, module_arguments]
 
     if variables is not None:
-        extra_arguments += [_ANSILBE_VARIABLE_FLAG, json.dumps(variables)]
+        extra_arguments += [_ANSIBLE_VARIABLE_FLAG, json.dumps(variables)]
 
     # TODO: Don't gather facts
-    process_arguments = [ansible_binary, _ANSIBLE_MODULE_FLAG, ansible_module, _ANSILBE_INVENTORY_FLAG,
-                         f"{_ANSIBLE_LOCAL_INVENTORY},", _ANSILBE_CONNECTION_FLAG, _ANSIBLE_LOCAL_CONNECTION] \
+    process_arguments = [ansible_location, _ANSIBLE_MODULE_FLAG, ansible_module, _ANSILBE_INVENTORY_FLAG,
+                         f"{_ANSIBLE_LOCAL_INVENTORY},", _ANSILBE_CONNECTION_FLAG, _ANSIBLE_LOCAL_CONNECTION,
+                         _ANSIBLE_VARIABLE_FLAG, f"ansible_python_interpreter={sys.executable}"] \
                          + extra_arguments + [_ANSIBLE_HOST]
-
-    process = subprocess.Popen(process_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
+    process = subprocess.Popen(process_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment,
+                               encoding="utf-8")
     output, error = process.communicate()
 
-    # TODO: set `encoding` on Popen instead
-    decoded_output = output.decode(_ANSIBLE_OUTPUT_ENCODING).strip()
-    decoded_error = error.decode(_ANSIBLE_OUTPUT_ENCODING).strip()
-
     if process.returncode != 0:
-        raise AnsibleRuntimeException(decoded_output, decoded_error)
+        raise AnsibleRuntimeException(output, error)
 
-    output_json = json.loads(_ANSIBLE_STDOUT_CALLBACK_JSON_LOG_EXTRACT_PATTERN.sub("", output.decode("utf-8")))
+    output_json = json.loads(_ANSIBLE_STDOUT_CALLBACK_JSON_LOG_EXTRACT_PATTERN.sub("", output))
     return AnsibleResult(output_json)
