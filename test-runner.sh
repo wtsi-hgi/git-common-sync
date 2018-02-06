@@ -6,8 +6,5 @@ PYTHONPATH=. coverage run -m unittest discover -v -s gitcommonsync/tests
 
 coverage run setup.py install
 
-# Awful bit of munging to map coverage to the module in the project package
-sed -i"" -e "s#[^\"]*ansible_module.py#${PWD}\/gitcommonsync\/ansible_module.py#g" .coverage*
-
 coverage combine -a
 coverage report
