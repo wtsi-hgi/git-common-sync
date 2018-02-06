@@ -1,5 +1,5 @@
 # Change Log
-## [Unreleased]
+## 3.0.0 - 2018-02-06
 ### Changed
 - Calling Ansible via CLI opposed to (unsupported) Python API.
 - Ansible is no longer installed as a dependency - it is expected to be on the path like `git`, `rsync`, etc.

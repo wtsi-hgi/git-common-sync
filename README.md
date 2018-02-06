@@ -21,7 +21,7 @@ _A tool to synchronise common files between Git repositories._
  - git-subrepo >= 0.3.1
  - python >= 3.6
  - rsync >= 3.1.1
- - ansible >= 2.0.0.2
+ - ansible >= 2.4
 
 
 ### Installation

@@ -10,7 +10,7 @@ except ImportError:
 
 setup(
     name="gitcommonsync",
-    version="2.0.0",
+    version="3.0.0",
     packages=find_packages(exclude=["tests"]),
     install_requires=open("requirements.txt", "r").readlines(),
     url="https://github.com/wtsi-hgi/git-common-sync",
