@@ -1,14 +1,10 @@
 import json
 import os
-import subprocess
-import sys
-
 import re
 import shutil
-# from ansible.inventory import Inventory
+import subprocess
+import sys
 from typing import Dict, List
-
-# from ansible.vars import VariableManager
 
 ANSIBLE_TEMPLATE_MODULE_NAME = "template"
 ANSIBLE_RSYNC_MODULE_NAME = "synchronize"
@@ -42,43 +38,39 @@ class AnsibleRuntimeException(RuntimeError):
 
 class AnsibleResult:
     """
-    TODO
+    Results of Ansible run.
     """
     @property
     def changed(self) -> bool:
-        """
-        TODO
-        :return:
-        """
-        return self._log["changed"] == True
+        return self._log["changed"]
 
     @property
     def command(self) -> str:
         return self._log["cmd"]
-    
+
     @property
     def stdout_lines(self) -> List[str]:
         return self._log["stdout_lines"]
 
     def __init__(self, log: Dict):
         """
-        TODO
-        :param log:
+        Constructor.
+        :param log: log output from Ansible
         """
         super().__init__()
         self._log = log
 
 
-
 def run_ansible(ansible_module: str, ansible_module_arguments: Dict=None, variables: Dict=None,
-                ansible_location: str=_ANSIBLE_LOCATION):
+                ansible_location: str=_ANSIBLE_LOCATION) -> AnsibleResult:
     """
-    TODO
-    :param ansible_module:
-    :param ansible_module_arguments:
-    :param variables:
-    :param ansible_location:
-    :return:
+    Runs the given Ansible module.
+    :param ansible_module: module to run
+    :param ansible_module_arguments: module arguments
+    :param variables: module variables
+    :param ansible_location: location of the Ansible binary
+    :return: results of Ansible run
+    :raises AnsibleRuntimeException: if Ansible fails
     """
     # HOME is required for https://github.com/ansible/ansible/issues/31617
     environment: Dict[str, str] = {variable: os.environ[variable] for variable in ("HOME", "PATH")}
@@ -98,7 +90,7 @@ def run_ansible(ansible_module: str, ansible_module_arguments: Dict=None, variab
     process_arguments = [ansible_location, _ANSIBLE_MODULE_FLAG, ansible_module, _ANSILBE_INVENTORY_FLAG,
                          f"{_ANSIBLE_LOCAL_INVENTORY},", _ANSILBE_CONNECTION_FLAG, _ANSIBLE_LOCAL_CONNECTION,
                          _ANSIBLE_VARIABLE_FLAG, f"ansible_python_interpreter={sys.executable}"] \
-                         + extra_arguments + [_ANSIBLE_HOST]
+                        + extra_arguments + [_ANSIBLE_HOST]
     process = subprocess.Popen(process_arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment,
                                encoding="utf-8")
     output, error = process.communicate()
