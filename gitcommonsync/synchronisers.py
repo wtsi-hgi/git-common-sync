@@ -174,7 +174,7 @@ class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchronis
     """
     def __init__(
             self, repository: GitRepository,
-            ansible_action_generator: Callable[[FileSynchronisation, str], Dict],
+            ansible_action_generator: Callable[[FileSynchronisation, str], Tuple[str, Dict]],
             ansible_variables_generator: Callable[[FileSynchronisation], Dict[str, str]]=lambda synchronisation: {}):
         """
         Constructor.
@@ -194,12 +194,12 @@ class _AnsibleFileBasedSynchroniser(Generic[Synchronisable], FileBasedSynchronis
         destination = os.path.join(self.repository.checkout_location, synchronisation.destination)
         target = os.path.join(self.repository.checkout_location, destination)
 
-        results = run_ansible(tasks=[dict(action=self.ansible_action_generator(synchronisation, target))],
-                              variables=self.ansible_variables_generator(synchronisation))
-        assert len(results) <= 1
-        if results[0].is_failed():
-            raise RuntimeError(results[0]._result)
-        if results[0].is_changed():
+        ansible_module, ansible_module_arguments = self.ansible_action_generator(synchronisation, target)
+        variables = self.ansible_variables_generator(synchronisation)
+
+        # TODO: Set ansible module binary
+        results = run_ansible(ansible_module, ansible_module_arguments, variables=variables)
+        if results.changed:
             return True, f"{synchronisation.source} => {target} (overwrite={synchronisation.overwrite})"
         else:
             return False, f"{synchronisation.source} == {target}"
@@ -209,11 +209,9 @@ class FileSynchroniser(_AnsibleFileBasedSynchroniser[FileSynchronisation]):
     """
     File synchroniser.
     """
-    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: dict(
-        module=ANSIBLE_RSYNC_MODULE_NAME,
-        args=dict(src=synchronisation.source, dest=target, recursive=True, delete=True, archive=False, perms=True,
-                  links=True, checksum=True)
-    )
+    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: (ANSIBLE_RSYNC_MODULE_NAME,
+                                dict(src=synchronisation.source, dest=target, recursive=True, delete=True,
+                                     archive=False, perms=True, links=True, checksum=True))
 
     def __init__(self, repository: GitRepository):
         super().__init__(repository, FileSynchroniser._ANSIBLE_ACTION_GENERATOR)
@@ -223,8 +221,8 @@ class TemplateSynchroniser(_AnsibleFileBasedSynchroniser[TemplateSynchronisation
     """
     Template based file synchroniser.
     """
-    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: dict(module=ANSIBLE_TEMPLATE_MODULE_NAME,
-                                                                     args=dict(src=synchronisation.source, dest=target))
+    _ANSIBLE_ACTION_GENERATOR = lambda synchronisation, target: (ANSIBLE_TEMPLATE_MODULE_NAME,
+                                                                 dict(src=synchronisation.source, dest=target))
     _ANSIBLE_VARIABLES_GENERATOR = lambda synchronisation: synchronisation.variables
 
     def __init__(self, repository: GitRepository):

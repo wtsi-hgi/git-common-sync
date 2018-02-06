@@ -16,5 +16,6 @@ setup(
     url="https://github.com/wtsi-hgi/git-common-sync",
     license="MIT",
     description="A tool to synchronise common files between Git repositories",
-    long_description=read_markdown("README.md")
+    long_description=read_markdown("README.md"),
+    zip_safe=True
 )
