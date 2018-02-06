@@ -21,6 +21,7 @@ _A tool to synchronise common files between Git repositories._
  - git-subrepo >= 0.3.1
  - python >= 3.6
  - rsync >= 3.1.1
+ - ansible >= 2.0.0.2
 
 
 ### Installation
@@ -69,9 +70,3 @@ If you wish to run the tests inside a Docker container (recommended), build `Doc
 
 ## Alternatives
 - Powerful but complex Ruby based alternative from the Puppet community: https://github.com/voxpupuli/modulesync.
-
-
-## License
-[MIT license](LICENSE.txt).
-
-Copyright (c) 2017 Genome Research Limited

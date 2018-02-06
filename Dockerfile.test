@@ -7,6 +7,7 @@ RUN git config --global user.email "example@example.com" \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        ansible \ru
         rsync \
         unzip \
     && rm -rf /var/lib/apt/lists/*
